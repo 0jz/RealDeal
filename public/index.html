@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Crni Petak Check — is this Black Friday discount real?</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <div class="logo">%</div>
+      <div>
+        <h1>Crni Petak Check</h1>
+        <p class="sub">Six Mozaik agents check Serbian Black Friday discounts against the 30-day lowest-price rule</p>
+      </div>
+    </div>
+    <div id="mode" class="mode">…</div>
+  </header>
+  <div class="disclaimer" role="note">
+    <strong>Synthetic data · fictional retailers · Not financial or legal advice.</strong>
+    “Likely violation of the 30-day rule” is an automated indication from synthetic price histories, not a legal finding. Every number links to its source — click it.
+  </div>
+
+  <main>
+    <section class="controls card">
+      <label>Shopping list
+        <select id="list"></select>
+      </label>
+      <button id="run" class="primary">Run check</button>
+      <button id="next" disabled title="PriceFeed reads the next page of the synthetic feed; affected products are re-checked and older results are marked superseded">Fetch next feed page</button>
+      <span id="status" class="status">Pick a list and run the check.</span>
+    </section>
+
+    <section id="headline" class="headline card hidden"></section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Live agent timeline</h2>
+        <div id="tl-stats" class="tl-stats"></div>
+      </div>
+      <div class="legend">
+        <span><i class="sw sw-loop"></i>Mozaik agent loop (runLoop)</span>
+        <span><i class="sw sw-worker"></i>worker-thread work</span>
+        <span><i class="sw sw-inference"></i>inference step</span>
+        <span><i class="sw sw-interception"></i>ShopTrust interception</span>
+        <span><i class="sw sw-sync"></i>sync rule (in fan-out)</span>
+        <span><i class="sw sw-superseded"></i>superseded (result discarded)</span>
+      </div>
+      <div id="timeline" class="timeline"><div class="empty">Run a check to see the agents work.</div></div>
+    </section>
+
+    <div class="grid2">
+      <section class="card">
+        <div class="card-head"><h2>Products</h2><span class="hint">options are computed by rules; the explanation is written by the Verdict agent</span></div>
+        <div id="cards" class="cards"><div class="empty">No results yet.</div></div>
+      </section>
+      <aside>
+        <section class="card">
+          <div class="card-head"><h2>Retailer trust (ShopTrust)</h2></div>
+          <div id="trust"><div class="empty">Audits appear here.</div></div>
+        </section>
+        <section class="card">
+          <div class="card-head"><h2>Mozaik event stream</h2></div>
+          <div id="log" class="log"></div>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <footer class="foot card">
+    <div id="law"></div>
+    <p>Data: fully synthetic, generated from a fixed seed by <code>scripts/generate-data.js</code>. Retailer names (TehnoKutak, MegaMarket Plus, Elektro Zvezda, DigiPolis, KupiBrzo.rs) and products are fictional. KP = a KupujemProdajem-style marketplace, simulated. <strong>Not financial or legal advice.</strong></p>
+  </footer>
+
+  <div id="drawer" class="drawer hidden" aria-hidden="true">
+    <div class="drawer-head"><h3 id="drawer-title">Source</h3><button id="drawer-close" aria-label="Close">×</button></div>
+    <div id="drawer-body" class="drawer-body"></div>
+  </div>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
