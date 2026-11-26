@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react"
 import type { Asset, Command, FinanceView, Goal, Intent, Wish } from "../../src/finance/types"
+import { motion, useReducedMotion } from "motion/react"
+import { LiveLog, settled } from "./LiveLog"
+import { Landing, SiteNav } from "./Landing"
 import { blankDraft, CommandError, followPlan, FinanceForm, planIdFromUrl, PlanResult, priceLabel, rsd, sendCommand, setPlanInUrl, toDraft, type Draft, type Product } from "./Finance"
 
 const MAX_CHARS = 1000
 const WARN_CHARS = 800
 const MAX_RSD = 10_000_000
+/** The prompt page. The server and Vite both serve index.html for it. */
+export const ASK_PATH = "/new"
 const EXAMPLES = [
 	"New phone for 75000 RSD. I can sell my iPhone 13, it's in good shape.",
 	"Hoću iPhone 15 za 85k, prodajem stari ajfon 13",
@@ -33,6 +38,9 @@ export function Planner() {
 	const [miss, setMiss] = useState<Miss | null>(null)
 	const [loading, setLoading] = useState(!!planIdFromUrl())
 	const [saleAmounts, setSaleAmounts] = useState<Record<string, string>>({})
+	/** checking: the agents are running on a new plan and the log is showing. revealed: the plan is shown after a live check. */
+	const [phase, setPhase] = useState<"idle" | "checking" | "revealed">("idle")
+	const reduce = useReducedMotion()
 	const stream = useRef<EventSource | null>(null)
 	const generation = useRef(0)
 
@@ -74,10 +82,21 @@ export function Planner() {
 			if (gen !== generation.current) return
 			if (response.status === 422) { setMiss({ message: data.error, unknown: Array.isArray(data.unknown) ? data.unknown : [] }); return }
 			if (!response.ok) throw new Error(data.error)
-			setDraft(toDraft(data.goal)); adopt(data); setPlanInUrl(data.id); listen(data.id, gen)
+			setDraft(toDraft(data.goal)); adopt(data); setPhase("checking"); setPlanInUrl(data.id); listen(data.id, gen)
 		} catch (e) { if (gen === generation.current) setError(e instanceof Error ? e.message : String(e)) }
 		finally { if (gen === generation.current) setBusy(false) }
 	}
+
+	// Once every agent has settled, leave the log readable for a moment, then show the plan.
+	useEffect(() => {
+		if (phase !== "checking" || !view || !settled(view)) return
+		const t = setTimeout(() => setPhase("revealed"), 600)
+		return () => clearTimeout(t)
+	}, [phase, view])
+	useEffect(() => {
+		if (phase !== "revealed") return
+		requestAnimationFrame(() => document.getElementById("plan-headline")?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }))
+	}, [phase])
 
 	/** Sends a change to the open plan. The draft follows the goal the server accepted. */
 	async function send(cmd: Command) {
@@ -98,7 +117,8 @@ export function Planner() {
 
 	function newPlan() {
 		generation.current++; stream.current?.close()
-		setView(null); setKept(null); setDraft(blankDraft()); setEditing(false); setText(""); setError(""); setMiss(null); setSaleAmounts({}); setBusy(false); setPlanInUrl(null)
+		history.replaceState(null, "", ASK_PATH)
+		setView(null); setKept(null); setPhase("idle"); setDraft(blankDraft()); setEditing(false); setText(""); setError(""); setMiss(null); setSaleAmounts({}); setBusy(false); setPlanInUrl(null)
 	}
 
 	const onPromptKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
@@ -107,25 +127,31 @@ export function Planner() {
 
 	if (loading) return <main className="page"><p className="note">Opening your plan…</p></main>
 
-	if (!view) return <main className="page ask-page">
+	const checking = phase === "checking"
+
+	// The front page is "/". The prompt page with the test prompts is ASK_PATH; a broken plan link also lands there to show its error.
+	if (!view && location.pathname !== ASK_PATH && !error) return <Landing />
+
+	if (!view || checking) return <main className="page ask-page">
 		<section className="ask" aria-labelledby="ask-title">
-			<p className="brand">RealDeal</p>
+			<p className="brand"><a href="/">RealDeal</a></p>
 			<h1 id="ask-title">What do you want to buy or sell?</h1>
 			<div className="ask-box">
 				<label className="field"><span className="sr-only">Describe what you want to buy or sell</span>
-					<textarea value={text} maxLength={MAX_CHARS} rows={1} placeholder="e.g. New phone for 75000 RSD. I can sell my old iPhone 13." aria-describedby="ask-count" onChange={e => setText(e.target.value)} onKeyDown={onPromptKey} />
+					<textarea value={text} maxLength={MAX_CHARS} rows={1} placeholder="e.g. New phone for 75000 RSD. I can sell my old iPhone 13." aria-describedby="ask-count" onChange={e => setText(e.target.value)} onKeyDown={onPromptKey} readOnly={checking} />
 				</label>
 				<div className="ask-foot">
 					<span id="ask-count" className={text.length >= WARN_CHARS ? "counter near" : "counter"} aria-live="polite">{text.length >= WARN_CHARS ? `${text.length}/${MAX_CHARS}` : ""}</span>
-					<button type="button" className="primary" disabled={busy || !text.trim()} onClick={() => void plan()}>{busy ? "Planning…" : "Make my plan"}</button>
+					<button type="button" className="primary" disabled={busy || checking || !text.trim()} onClick={() => void plan()}>{busy || checking ? "Checking…" : "Make my plan"}</button>
 				</div>
 			</div>
 			{miss && <p className="alert" role="alert">{miss.unknown.length ? `I couldn't match: ${miss.unknown.join(", ")}` : miss.message}</p>}
 			{error && <p className="alert" role="alert">{error}</p>}
-			<div className="examples">
+			{view && checking && <LiveLog view={view} />}
+			{!checking && <div className="examples">
 				<p className="label">Or try one of these</p>
 				<ul>{EXAMPLES.map(ex => <li key={ex}><button type="button" onClick={() => setText(ex)}>{ex}</button></li>)}</ul>
-			</div>
+			</div>}
 		</section>
 	</main>
 
@@ -133,9 +159,10 @@ export function Planner() {
 		.map(id => catalogue.find(p => p.id === id))
 		.filter((p): p is Product => !!p && p.name !== wish.name)
 
-	return <div className="page finance-page planner-page">
-		<header className="planner-bar"><p className="brand">RealDeal</p><button type="button" className="ghost" onClick={newPlan}>New plan</button></header>
+	return <><SiteNav action={<button type="button" className="ghost" onClick={newPlan}>New plan</button>} />
+	<motion.div className="page finance-page planner-page" initial={phase === "revealed" && !reduce ? { opacity: 0, y: 12 } : false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}>
 		{error && <p className="alert" role="alert">{error}</p>}
+		{phase === "revealed" && <LiveLog view={view} collapsed />}
 
 		<section className="understood" aria-label="What I understood">
 			<div className="group-head"><h2>What I understood</h2><span className="note">Tap a chip to change it. The plan updates right away.</span></div>
@@ -156,7 +183,7 @@ export function Planner() {
 
 		<PlanResult view={view} busy={busy} saleAmounts={saleAmounts} setSaleAmounts={setSaleAmounts} command={cmd => void send(cmd)} />
 		<footer className="foot">RealDeal doesn't buy, sell or hold money. Prices are the ones you entered; typical prices are rough figures and can be out of date.</footer>
-	</div>
+	</motion.div></>
 }
 
 /** A chip that opens a small popover. Closes on Escape or a click outside. */

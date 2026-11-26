@@ -1,0 +1,33 @@
+/* Tailwind theme and utilities without its preflight reset, so the existing look (styles.css) is unchanged. */
+@layer theme, legacy, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "./styles.css" layer(legacy);
+@import "./landing.css" layer(legacy);
+
+/* shadcn names, pointed at the existing palette in styles.css. */
+@theme inline {
+	--color-background: var(--paper);
+	--color-foreground: var(--ink);
+	--color-card: var(--sheet);
+	--color-primary: var(--accent);
+	--color-primary-foreground: var(--accent-ink);
+	--color-muted-foreground: var(--muted);
+	--color-border: var(--rule);
+	--color-destructive: var(--fake);
+	--color-ring: var(--focus);
+}
+
+/* The live log is a dark panel in both themes, in the hero's navy. Agent colours are Nikita's lighter hero tones. */
+:root {
+	--log-bg: var(--night);
+	--log-ink: var(--night-ink);
+	--log-dim: var(--night-muted);
+	--log-rule: var(--night-rule);
+	--log-purchase: #93c5fd;
+	--log-resale: #fdba74;
+	--log-trust: #c4b5fd;
+	--log-strategy: #86efac;
+	--log-guardian: var(--accent);
+	--log-error: #fca5a5;
+}
