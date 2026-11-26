@@ -1,4 +1,4 @@
-@import url("/styles.css");
+@import url("styles.css");
 /* Public site layer on top of the demo styles (shared drawer, badges, colours). */
 body.site { background: #f7f7f5; font-size: 15px; }
 .site .wrap { max-width: 1160px; margin: 0 auto; padding: 0 24px; }

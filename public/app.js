@@ -1,5 +1,5 @@
 // Single-file frontend: no build step. Talks to the Node server over REST + Server-Sent Events.
-import { $, esc, rsd, num, srcLink, nums, ctx, openDrawer, openSource, installSourceClicks, statusBadge, STATUS } from "/js/common.js";
+import { $, esc, rsd, num, srcLink, nums, ctx, openDrawer, openSource, installSourceClicks, statusBadge, STATUS, api, STATIC, staticJson } from "./js/common.js";
 const AGENTS = ["PriceFeed", "ThirtyDay", "KP", "CrossShop", "ShopTrust", "Verdict", "PriceScout"];
 const AGENT_INFO = {
   PriceFeed: "reads the synthetic feed (async file I/O)", ThirtyDay: "30-day rule, sync arithmetic", KP: "LLM loop + worker search",
@@ -7,12 +7,12 @@ const AGENT_INFO = {
   PriceScout: "scanner runs: LLM loop + worker averages",
 };
 
-let meta = null, run = null, es = null, refetchTimer = null, renderQueued = false;
-ctx.getRunId = () => run?.id;
+let meta = null, run = null, es = null, refetchTimer = null, renderQueued = false, clock = null, replaying = false;
+ctx.getRunId = () => run?.sourceKey ?? run?.id; // sourceKey: static snapshot after the recorded late feed page
 
 // ---------- boot ----------
 async function boot() {
-  meta = await fetch("/api/meta").then((r) => r.json()); ctx.meta = meta;
+  meta = await api("/api/meta"); ctx.meta = meta;
   $("#list").innerHTML = meta.lists.map((l) => `<option value="${l.id}">${esc(l.name)} (${l.count} items)</option>`).join("");
   $("#mode").className = "mode " + (meta.mode === "llm" ? "llm" : "tpl");
   $("#mode").innerHTML = meta.mode === "llm"
@@ -27,12 +27,13 @@ async function boot() {
 
 async function startRun() {
   $("#run").disabled = true;
-  const { runId } = await fetch("/api/runs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ listId: $("#list").value }) }).then((r) => r.json());
+  const { runId } = await api("/api/runs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ listId: $("#list").value }) });
   history.replaceState(null, "", `?run=${runId}`);
   attach(runId);
 }
 
 function attach(runId) {
+  if (STATIC) return replayRecorded(runId);
   es?.close();
   es = new EventSource(`/api/runs/${runId}/stream`);
   es.addEventListener("snapshot", (e) => { run = JSON.parse(e.data); $("#list").value = run.listId; renderAll(); });
@@ -50,7 +51,7 @@ function attach(runId) {
 function refetch() {
   clearTimeout(refetchTimer);
   refetchTimer = setTimeout(async () => {
-    const s = await fetch(`/api/runs/${run.id}`).then((r) => r.json());
+    const s = await api(`/api/runs/${run.id}`);
     run.items = s.items; run.trust = s.trust; run.headline = s.headline; run.feed = s.feed; run.completedAt = s.completedAt;
     renderAll(false);
   }, 60);
@@ -71,7 +72,7 @@ function renderStatus() {
     ? `Run <code>${run.id}</code> complete in ${Math.round(run.completedAt - run.startedAt)} ms · feed pages read: ${run.feed.pagesRead.join(", ")}`
     : `Run <code>${run.id}</code> in progress · ${running} task(s) running`;
   $("#run").disabled = !done && running > 0;
-  $("#next").disabled = !done || Math.max(0, ...run.feed.pagesRead) >= 3;
+  $("#next").disabled = replaying || !done || Math.max(0, ...run.feed.pagesRead) >= 3 || (STATIC && !run.recordedNextPage);
 }
 
 // ---------- headline ----------
@@ -123,7 +124,7 @@ function renderTimeline() {
   if (!run) return;
   const el = $("#timeline");
   const t0 = run.startedAt;
-  const nowAbs = performance.timeOrigin + performance.now();
+  const nowAbs = clock ?? performance.timeOrigin + performance.now();
   const { map, segs } = buildScale(run.tasks, t0, nowAbs);
   const pctX = (abs) => map(abs - t0);
   const lanes = AGENTS.filter((a) => a !== "PriceScout" || run.tasks.some((t) => t.agent === a)).map((agent) => {
@@ -240,5 +241,40 @@ function appendLog(e) {
 
 installSourceClicks((e) => { const b = e.target.closest("[data-task]"); if (b) openSource("task:" + b.dataset.task); });
 $("#run").onclick = startRun;
-$("#next").onclick = async () => { $("#next").disabled = true; await fetch(`/api/runs/${run.id}/next-page`, { method: "POST" }); };
+$("#next").onclick = async () => {
+  $("#next").disabled = true;
+  if (STATIC) { const after = { ...(await staticJson(`data/runs/${run.id}.next-page.json`)), sourceKey: `${run.id}.next-page` }; const fresh = after.tasks.filter((t) => !run.tasks.some((x) => x.id === t.id)); return replay(after, Math.min(...fresh.map((t) => t.start)), run); }
+  await fetch(`/api/runs/${run.id}/next-page`, { method: "POST" });
+};
+
+// ---------- static snapshot: replay a recorded run on its real timestamps (slowed down to be watchable) ----------
+async function replayRecorded(runId) {
+  const full = await api(`/api/runs/${runId}`);
+  const idx = await staticJson("data/index.json");
+  full.recordedNextPage = !!idx.nextPage?.includes(runId);
+  $("#list").value = full.listId;
+  return replay(full, full.startedAt, null);
+}
+function replay(full, startAt, keep) {
+  replaying = true;
+  const ends = full.tasks.map((t) => t.end ?? t.start);
+  const span = Math.max(1, Math.max(...ends, full.completedAt ?? 0) - startAt), DUR = Math.min(4000, Math.max(1500, span * 25));
+  const wall0 = performance.now();
+  return new Promise((done) => {
+    const step = () => {
+      const f = Math.min(1, (performance.now() - wall0) / DUR); clock = startAt + f * span;
+      if (f < 1) {
+        run = {
+          ...full, completedAt: null, headline: keep?.headline ?? null, items: keep?.items ?? [], trust: keep?.trust ?? [],
+          tasks: full.tasks.filter((t) => t.start <= clock).map((t) => ((t.end ?? Infinity) > clock ? { ...t, end: null, status: "running", steps: t.steps.filter((x) => x.start <= clock).map((x) => (x.end > clock ? { ...x, end: null } : x)) } : t)),
+          log: full.log.filter((l) => l.t <= clock),
+        };
+        if (!keep) { $("#log").innerHTML = ""; run.log.slice(-60).forEach(appendLog); }
+        renderTimeline(); renderStatus(); $("#status").innerHTML = `Replaying recorded run <code>${esc(full.id)}</code>… ${run.tasks.filter((t) => t.status === "running").length} task(s) running`;
+        requestAnimationFrame(step);
+      } else { clock = null; replaying = false; run = full; renderAll(); done(); }
+    };
+    step();
+  });
+}
 boot();

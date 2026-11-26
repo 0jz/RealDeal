@@ -1,6 +1,6 @@
 // Mobile product scanner: camera (BarcodeDetector, or the vendored ZXing fallback), photo, or manual search.
 // A scan starts a Mozaik run of kind "scan" (POST /api/scans); every figure shown comes from GET /api/scans/:id.
-import { $, esc, rsd, num, srcLink, ctx, api, post, installSourceClicks, statusBadge, fmtInt } from "/js/common.js";
+import { $, esc, rsd, num, srcLink, ctx, api, post, installSourceClicks, statusBadge, fmtInt } from "./js/common.js";
 
 const FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e"];
 let stream = null, stopLoop = null, scanId = null, pollTimer = null, meta = null;
@@ -18,7 +18,7 @@ async function boot() {
 // ---------- camera ----------
 function loadZxing() {
   if (window.ZXing) return Promise.resolve(window.ZXing);
-  return new Promise((ok, fail) => { const s = document.createElement("script"); s.src = "/vendor/zxing.min.js"; s.onload = () => ok(window.ZXing); s.onerror = fail; document.head.append(s); });
+  return new Promise((ok, fail) => { const s = document.createElement("script"); s.src = "vendor/zxing.min.js"; s.onload = () => ok(window.ZXing); s.onerror = fail; document.head.append(s); });
 }
 async function nativeDetector() {
   if (!("BarcodeDetector" in window)) return null;
@@ -120,7 +120,7 @@ function render(r) {
     ${w ? `<div class="card"><h3>World reference prices <span class="badge warn">synthetic</span></h3><table class="mini"><tr><th>Market</th><th>Local</th><th>In RSD</th></tr>${w.rows.map((x) => `<tr><td>${esc(x.country)}</td><td>${srcLink("world:" + x.id, `${x.price.toLocaleString("en-US")} ${x.currency}`)}</td><td>${num(x.rsd)}</td></tr>`).join("")}</table>
       <p class="small muted">Converted with approximate fixed rates (${[...new Set(w.rows.map((x) => x.currency))].map((c) => srcLink("fx:" + c, c)).join(", ")}), not live or official rates. Generated reference data, not real market prices.</p></div>` : ""}
     ${r.scoutSummary ? `<p class="small muted">PriceScout (${esc(r.scoutSummarySource)}): ${esc(r.scoutSummary)}</p>` : ""}
-    <p class="small"><a href="/demo.html?run=${r.runId}">See the agents work on this scan →</a></p>
+    <p class="small"><a href="demo.html?run=${r.runId}">See the agents work on this scan →</a></p>
     <p class="small muted">Synthetic data · fictional retailers · Not financial advice.</p>`;
 }
 

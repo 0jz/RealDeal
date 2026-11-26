@@ -139,3 +139,6 @@ blockquote { margin: 0 0 8px; padding: 6px 10px; border-left: 3px solid #cbd5e1;
 .lane-track .gap { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, #e5e7eb 0 2px, transparent 2px 6px); }
 .ticks .gapl { color: #9ca3af; font-style: italic; transform: translateX(-50%); }
 .demo-nav { display: flex; gap: 14px; margin-left: auto; } .demo-nav a { color: #fde68a; text-decoration: none; font-weight: 600; }
+.static-banner { background: #1e3a8a; color: #fff; padding: 8px 24px; font-size: 13px; text-align: center; }
+.static-banner a { color: #fde68a; } .static-banner code { background: #ffffff22; color: #fff; }
+@media (max-width: 600px) { .static-banner { font-size: 11px; padding: 5px 10px; } }

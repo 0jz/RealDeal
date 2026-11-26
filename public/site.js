@@ -1,6 +1,6 @@
 // Public site: landing + embedded checker. Every figure comes from the server (/api/summary, /api/runs/*),
 // i.e. from the same agents and rules as the "under the hood" view. Nothing here computes or hardcodes numbers.
-import { $, esc, num, srcLink, nums, ctx, api, post, openDrawer, installSourceClicks, statusBadge, modePill, fmtInt } from "/js/common.js";
+import { $, esc, num, srcLink, nums, ctx, api, post, openDrawer, installSourceClicks, statusBadge, modePill, fmtInt, STATIC } from "./js/common.js";
 
 const AGENT_COPY = {
   PriceFeed: ["Reads the feed", "Loads the retailers’ Black Friday price lists page by page, including late price changes, and re-triggers checks when a price changes."],
@@ -15,6 +15,7 @@ let summary = null, meta = null, run = null, es = null, timer = null;
 ctx.getRunId = () => run?.id ?? summary?.reference.runId;
 
 async function boot() {
+  if (STATIC) { const n = $(".notice"); n.innerHTML = n.innerHTML.replace("computed live by the agents", "computed by the agents in a recorded engine run"); }
   meta = await api("/api/meta"); ctx.meta = meta;
   $("#mode").innerHTML = modePill(meta);
   $("#list").innerHTML = meta.lists.map((l) => `<option value="${l.id}">${esc(l.name)} (${l.count} items)</option>`).join("");
@@ -33,7 +34,7 @@ async function loadSummary() {
 
 function renderSummary() {
   const s = summary, r = s.reference, h = r.headline, st = r.stats;
-  $("#hood-link").href = `/demo.html?run=${r.runId}`;
+  $("#hood-link").href = `demo.html?run=${r.runId}`;
   if (h?.complete) {
     const flagged = r.trust.filter((t) => t.flagged);
     $("#hero-stats").innerHTML = `
@@ -41,7 +42,7 @@ function renderSummary() {
       <div class="hs"><div class="hs-v red">${num(h.avoided, { plain: true })}</div><div class="hs-l">of fake “discount” the agents caught across ${fmtInt(h.total)} products</div></div>
       <div class="hs"><div class="hs-v green">${num(h.planSaves, { plain: true, signed: true })}</div><div class="hs-l">saved by following the agents’ best plan instead of the ads</div></div>
       <div class="hs"><div class="hs-v">${fmtInt(flagged.length)}<span> of ${fmtInt(r.trust.length)}</span></div><div class="hs-l">retailers flagged by ShopTrust (${flagged.map((t) => esc(t.name)).join(", ") || "none"})</div></div>`;
-    $("#hero-foot").innerHTML = `Live result of ${fmtInt(st.agentsActive)} agents checking “${esc(r.listName)}” in this server session — ${fmtInt(st.tasks)} agent tasks in ${fmtInt(st.runMs)} ms. <a href="#" id="hero-breakdown">Breakdown</a> · <a href="/demo.html?run=${r.runId}">watch the timeline</a>`;
+    $("#hero-foot").innerHTML = `${STATIC ? "Result" : "Live result"} of ${fmtInt(st.agentsActive)} agents checking “${esc(r.listName)}” ${STATIC ? "in the recorded engine run (static snapshot)" : "in this server session"} — ${fmtInt(st.tasks)} agent tasks in ${fmtInt(st.runMs)} ms. <a href="#" id="hero-breakdown">Breakdown</a> · <a href="demo.html?run=${r.runId}">watch the timeline</a>`;
     $("#hero-breakdown").onclick = (e) => { e.preventDefault(); openBreakdown(h, r.runId); };
   }
   renderSpotlight(r.spotlight);
@@ -85,7 +86,7 @@ function openBreakdown(h, runId) {
     <table class="tbl"><tr><th>Product</th><th>Ad at</th><th>Fake part</th><th>Plan</th><th>Saving</th></tr>
     ${h.rows.map((r) => `<tr><td>${esc(r.product)}</td><td>${esc(r.adRetailer)}</td><td>${num(r.fake)}</td><td>${esc(r.planTitle ?? "—")}</td><td>${num(r.planSaving, { signed: true })}</td></tr>`).join("")}
     <tr class="sum"><td colspan="2">Total</td><td>${num(h.avoided)}</td><td></td><td>${num(h.planSaves, { signed: true })}</td></tr></table>
-    <p><a href="/demo.html?run=${runId}">Open the run under the hood →</a></p>`);
+    <p><a href="demo.html?run=${runId}">Open the run under the hood →</a></p>`);
 }
 
 // ---------- embedded checker (same API + SSE as the demo UI) ----------
@@ -96,7 +97,8 @@ async function startCheck() {
 }
 function attach(runId) {
   es?.close(); run = { id: runId };
-  $("#hood").href = `/demo.html?run=${runId}`; $("#hood").classList.remove("hidden");
+  $("#hood").href = `demo.html?run=${runId}`; $("#hood").classList.remove("hidden");
+  if (STATIC) return refresh();
   es = new EventSource(`/api/runs/${runId}/stream`);
   for (const ev of ["snapshot", "task", "headline", "items"]) es.addEventListener(ev, refresh);
 }
@@ -112,7 +114,7 @@ function renderRun() {
   const done = run.tasks.filter((t) => t.status !== "running").length;
   $("#progress-bar").style.width = run.tasks.length ? `${(100 * done) / run.tasks.length}%` : "0";
   const h = run.headline;
-  $("#status").textContent = h?.complete ? `Done: ${run.stats.tasks} agent tasks, ${run.stats.runMs} ms` : `${run.tasks.filter((t) => t.status === "running").length} agent task(s) running…`;
+  $("#status").textContent = h?.complete ? `${STATIC ? "Recorded run" : "Done"}: ${run.stats.tasks} agent tasks, ${run.stats.runMs} ms` : `${run.tasks.filter((t) => t.status === "running").length} agent task(s) running…`;
   if (h) {
     $("#result-headline").classList.remove("hidden");
     $("#result-headline").innerHTML = `<div><span>You avoided</span> ${num(h.avoided, { cls: "red" })} <span>in fake discounts</span></div>

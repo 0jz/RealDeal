@@ -9,7 +9,9 @@
     "data": "node scripts/generate-data.js",
     "test": "node scripts/smoke-test.js && node scripts/site-test.js",
     "test:llm-path": "node scripts/llm-path-test.js",
-    "test:site": "node scripts/site-test.js"
+    "test:site": "node scripts/site-test.js",
+    "build:pages": "node scripts/build-pages.js",
+    "test:pages": "node scripts/build-pages.js && node scripts/pages-test.js"
   },
   "engines": {
     "node": ">=20"

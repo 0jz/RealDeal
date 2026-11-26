@@ -5,7 +5,61 @@ export const $ = (s, root = document) => root.querySelector(s);
 export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 export const rsd = (v) => Math.round(v).toLocaleString("en-US") + " RSD";
 export const fmtInt = (v) => Number(v).toLocaleString("en-US");
-export const api = async (path, opts) => { const r = await fetch(path, opts); if (!r.ok) throw Object.assign(new Error((await r.json().catch(() => ({}))).error || r.statusText), { status: r.status }); return r.json(); };
+const liveApi = async (path, opts) => { const r = await fetch(path, opts); if (!r.ok) throw Object.assign(new Error((await r.json().catch(() => ({}))).error || r.statusText), { status: r.status }); return r.json(); };
+
+// ---------- static snapshot mode (GitHub Pages) ----------
+// `npm run build:pages` exports a recorded engine run into pages-site/data/ and marks every page with
+// <meta name="bfc-static">. The same API paths are then answered from those JSON files (relative URLs, so it
+// works under https://<user>.github.io/<repo>/). Nothing is computed here: only lookups in exported engine output.
+export const STATIC = typeof document !== "undefined" && !!document.querySelector('meta[name="bfc-static"]');
+const jcache = new Map();
+const notFound = (what) => Object.assign(new Error(`${what} is not in the static snapshot`), { status: 404 });
+export function staticJson(p) {
+  if (!jcache.has(p)) jcache.set(p, fetch(p).then((r) => { if (!r.ok) throw notFound(p); return r.json(); }));
+  return jcache.get(p);
+}
+const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]+/g, " ").trim();
+/** Same matching as the server's findProducts (server/app.js): EAN-13/GTIN exact, else name tokens. */
+export function findProducts(products, q) {
+  const raw = String(q || "").trim();
+  if (!raw) return products;
+  const digits = raw.replace(/\D/g, "");
+  const byCode = products.filter((p) => p.ean13 === digits || p.gtin === raw.toUpperCase());
+  if (byCode.length) return byCode;
+  const tokens = norm(raw).split(" ").filter(Boolean);
+  return products.map((p) => ({ p, score: tokens.filter((t) => norm(p.name + " " + p.category).includes(t)).length / tokens.length }))
+    .filter((x) => x.score >= 0.5).sort((a, b) => b.score - a.score).map((x) => x.p);
+}
+async function staticApi(path, method = "GET", body = {}) {
+  const [p, qs] = path.split("?"); const q = new URLSearchParams(qs || ""); let m;
+  const idx = await staticJson("data/index.json");
+  if (p === "/api/meta") return staticJson("data/meta.json");
+  if (p === "/api/summary") return staticJson("data/summary.json");
+  if (p === "/api/products") return findProducts(await staticJson("data/products.json"), q.get("q"));
+  if (p === "/api/runs" && method === "POST") { const id = idx.lists[body.listId]; if (!id) throw notFound("list"); return { runId: id }; }
+  if (p === "/api/scans" && method === "POST") {
+    const code = String(body.code || body.q || "").trim();
+    const product = code && findProducts(await staticJson("data/products.json"), code)[0];
+    if (!product) throw notFound("product");
+    return { runId: idx.scans[product.id], product };
+  }
+  if ((m = /^\/api\/runs\/([\w-]+)$/.exec(p))) return staticJson(`data/runs/${m[1]}.json`);
+  if ((m = /^\/api\/scans\/([\w-]+)$/.exec(p))) return staticJson(`data/scans/${m[1]}.json`);
+  if (p === "/api/source") {
+    const ref = q.get("ref"), run = q.get("run");
+    const g = await staticJson("data/sources/global.json"); if (g[ref]) return g[ref];
+    if (run) { const r = await staticJson(`data/sources/run-${run}.json`).catch(() => ({})); if (r[ref]) return r[ref]; }
+    throw notFound(ref);
+  }
+  throw notFound(path);
+}
+export const api = (path, opts) => (STATIC ? staticApi(path, opts?.method, opts?.body ? JSON.parse(opts.body) : {}) : liveApi(path, opts));
+if (STATIC) {
+  const repo = document.querySelector('meta[name="bfc-repo"]')?.content;
+  staticJson("data/index.json").then((idx) => {
+    document.body.insertAdjacentHTML("afterbegin", `<div class="static-banner" role="note"><b>Static snapshot of a real engine run</b> (recorded ${esc(idx.recordedAt.slice(0, 16).replace("T", " "))} UTC, engine commit ${esc(idx.commit)}) — live agents run with <code>npm start</code> (see ${repo ? `<a href="${esc(repo)}">the repo</a>` : "the repo"}).</div>`);
+  }).catch(() => {});
+}
 export const post = (path, body) => api(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body ?? {}) });
 
 /** Page context: meta (retailers/products for labels) and the run the drawer resolves refs against. */
@@ -29,7 +83,7 @@ function ensureDrawer() {
 export function openDrawer(title, html) { ensureDrawer(); $("#drawer-title").textContent = title; $("#drawer-body").innerHTML = html; $("#drawer").classList.remove("hidden"); }
 
 export async function openSource(ref) {
-  const s = await fetch(`/api/source?ref=${encodeURIComponent(ref)}&run=${ctx.getRunId() ?? ""}`).then((r) => (r.ok ? r.json() : null));
+  const s = await api(`/api/source?ref=${encodeURIComponent(ref)}&run=${ctx.getRunId() ?? ""}`).catch(() => null);
   if (!s) return openDrawer(ref, `<p>Source not found.</p>`);
   openDrawer(s.title, renderSource(s, ref));
 }

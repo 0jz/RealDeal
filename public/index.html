@@ -6,14 +6,14 @@
   <title>Crni Petak Check — is that Black Friday discount real?</title>
   <meta name="description" content="Mozaik agents check Serbian Black Friday discounts against the 30-day lowest-price rule (Zakon o trgovini, čl. 37). Synthetic demo data." />
   <link rel="icon" href="data:," />
-  <link rel="stylesheet" href="/site.css" />
+  <link rel="stylesheet" href="site.css" />
 </head>
 <body class="site">
   <header class="nav">
-    <a class="brand" href="/"><span class="logo">%</span><span>Crni Petak Check</span></a>
+    <a class="brand" href="./"><span class="logo">%</span><span>Crni Petak Check</span></a>
     <nav>
       <a href="#rule">The rule</a><a href="#agents">How it works</a><a href="#checker">Checker</a>
-      <a href="/scan.html" class="nav-scan">Scanner</a><a href="/demo.html" id="hood-link">Under the hood</a>
+      <a href="scan.html" class="nav-scan">Scanner</a><a href="demo.html" id="hood-link">Under the hood</a>
     </nav>
     <div id="mode"></div>
   </header>
@@ -24,7 +24,7 @@
       <p class="eyebrow">Black Friday · Serbia · 30-day lowest-price rule</p>
       <h1>Is that <em id="hero-claim">discount</em> real?</h1>
       <p class="lead">Retailers must compare a discount with their <b>lowest price in the previous 30 days</b>. Our Mozaik agents check every advertised discount against the price history, cross-shop the same product, audit retailer trust and look for sealed listings on the marketplace — then tell you the cheapest honest way to buy.</p>
-      <div class="cta"><a class="btn primary" href="#checker">Check a shopping list</a><a class="btn" href="/scan.html">Scan a product</a></div>
+      <div class="cta"><a class="btn primary" href="#checker">Check a shopping list</a><a class="btn" href="scan.html">Scan a product</a></div>
       <div id="hero-stats" class="hero-stats" aria-live="polite"><div class="loading">The agents are checking the demo feed…</div></div>
       <p id="hero-foot" class="hero-foot"></p>
     </div>
@@ -70,15 +70,15 @@
     </section>
 
     <section class="section scan-cta card">
-      <div><h2>In a shop? Scan the barcode.</h2><p>On your phone, the scanner reads the EAN-13 barcode and shows the average price in Serbia, the synthetic world reference average and where it is cheapest to buy. Need demo barcodes? <a href="/barcodes.html">Print the test sheet</a>.</p></div>
-      <a class="btn primary" href="/scan.html">Open the scanner</a>
+      <div><h2>In a shop? Scan the barcode.</h2><p>On your phone, the scanner reads the EAN-13 barcode and shows the average price in Serbia, the synthetic world reference average and where it is cheapest to buy. Need demo barcodes? <a href="barcodes.html">Print the test sheet</a>.</p></div>
+      <a class="btn primary" href="scan.html">Open the scanner</a>
     </section>
   </main>
 
   <footer class="footer wrap">
     <p><b>Synthetic data · fictional retailers · Not financial or legal advice.</b> “Likely violation of the 30-day rule” is an automated indication from synthetic price histories, not a legal finding. KP = a KupujemProdajem-style marketplace, simulated.</p>
-    <p>Built on <a href="https://www.npmjs.com/package/@mozaik-ai/core" target="_blank" rel="noopener">@mozaik-ai/core</a> for the JigJoy Black Friday AI Hackathon (Finance track). <a href="/demo.html">Under the hood</a> · <a href="/barcodes.html">Demo barcodes</a></p>
+    <p>Built on <a href="https://www.npmjs.com/package/@mozaik-ai/core" target="_blank" rel="noopener">@mozaik-ai/core</a> for the JigJoy Black Friday AI Hackathon (Finance track). <a href="demo.html">Under the hood</a> · <a href="barcodes.html">Demo barcodes</a></p>
   </footer>
-  <script type="module" src="/site.js"></script>
+  <script type="module" src="site.js"></script>
 </body>
 </html>
