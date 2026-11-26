@@ -1,0 +1,35 @@
+/* Tailwind theme and utilities without its preflight reset, so the existing look (styles.css) is unchanged. */
+@layer theme, legacy, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "./styles.css" layer(legacy);
+
+/* shadcn names, pointed at the existing palette in styles.css. */
+@theme inline {
+	--color-background: var(--paper);
+	--color-foreground: var(--ink);
+	--color-card: var(--sheet);
+	--color-primary: var(--real);
+	--color-muted-foreground: var(--muted);
+	--color-border: var(--rule);
+	--color-destructive: var(--fake);
+	--color-ring: var(--focus);
+}
+
+/* The live log is a dark panel in both themes. Agent colours reuse the dark-theme lane colours. */
+:root {
+	--log-bg: #18212c;
+	--log-ink: #e8edf2;
+	--log-dim: #9aa6b4;
+	--log-rule: #2d3640;
+	--log-purchase: #6fb0dc;
+	--log-resale: #f09a6e;
+	--log-trust: #c08fc8;
+	--log-strategy: #4fc08a;
+	--log-guardian: #e0a445;
+	--log-error: #ff6b7a;
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) { --log-bg: #0c1117; --log-rule: #222a33; }
+}
+:root[data-theme="dark"] { --log-bg: #0c1117; --log-rule: #222a33; }

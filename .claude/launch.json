@@ -6,6 +6,13 @@
 			"runtimeExecutable": "npm",
 			"runtimeArgs": ["run", "dev"],
 			"port": 8787
+		},
+		{
+			"name": "realdeal-redesign",
+			"runtimeExecutable": "npm",
+			"runtimeArgs": ["run", "dev"],
+			"env": { "PORT": "8788" },
+			"port": 8788
 		}
 	]
 }
