@@ -1,0 +1,21 @@
+{
+  "name": "blackfriday-check",
+  "version": "1.0.0",
+  "description": "Multi-agent (Mozaik) checker for fake Black Friday discounts under Serbia's 30-day lowest-price rule. Synthetic data.",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "data": "node scripts/generate-data.js",
+    "test": "node scripts/smoke-test.js",
+    "test:llm-path": "node scripts/llm-path-test.js",
+    "screenshot": "node scripts/screenshot.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@mozaik-ai/core": "6.0.0"
+  }
+}
