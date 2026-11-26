@@ -1033,20 +1033,24 @@ a {
 
 .ask-box .field textarea {
 	font-size: 17px;
-	min-height: 120px;
+	line-height: 1.4;
+	min-height: 140px;
+	/* One line of text sits in the middle of the empty box (border is 1.5px each side). */
+	padding: calc((140px - 1.4em) / 2 - 1.5px) 20px;
+	text-align: center;
 	background: var(--sheet);
 }
 
 .ask-foot {
-	display: flex;
-	flex-wrap: wrap;
-	justify-content: space-between;
-	align-items: center;
-	gap: 12px;
+	display: grid;
+	justify-items: center;
+	gap: 8px;
 }
 
 .ask-foot .primary {
-	margin-left: auto;
+	justify-self: center;
+	font-size: 19px;
+	padding: 16px 48px;
 }
 
 .counter {
@@ -1063,6 +1067,8 @@ a {
 .ask .examples {
 	width: 100%;
 	justify-items: center;
+	margin-top: 28px;
+	gap: 12px;
 }
 
 .ask .examples ul {
@@ -1261,7 +1267,11 @@ a {
 @media (max-width: 600px) {
 	.ask-foot .primary {
 		width: 100%;
-		margin-left: 0;
+	}
+
+	/* The placeholder wraps to two lines here. */
+	.ask-box .field textarea {
+		padding-block: calc((140px - 2.8em) / 2 - 1.5px);
 	}
 
 	.understood {
