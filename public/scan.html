@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f17" />
+  <title>Scanner — Crni Petak Check</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/site.css" />
+  <link rel="stylesheet" href="/scan.css" />
+</head>
+<body class="site scan-page">
+  <header class="nav"><a class="brand" href="/"><span class="logo">%</span><span>Scanner</span></a><div id="mode"></div></header>
+  <div class="notice small">Synthetic demo data · fictional shops · world prices are synthetic references · <b>Not financial advice</b></div>
+  <main class="scan-wrap">
+    <section class="scanner card">
+      <div id="viewport" class="viewport hidden"><video id="video" playsinline muted></video><div class="aim"></div><button id="stop" class="stop" aria-label="Stop camera">×</button></div>
+      <div class="scan-actions">
+        <button id="camera" class="btn primary big">📷 Scan barcode</button>
+        <label class="btn big file">🖼 Photo<input id="photo" type="file" accept="image/*" capture="environment" hidden /></label>
+      </div>
+      <p id="cam-help" class="small muted"></p>
+      <form id="manual" class="manual" autocomplete="off">
+        <input id="q" list="products" inputmode="search" placeholder="EAN-13 or product name" aria-label="EAN-13 or product name" />
+        <datalist id="products"></datalist>
+        <button class="btn">Find</button>
+      </form>
+      <p class="small muted">No barcode at hand? <a href="/barcodes.html">Demo barcodes</a></p>
+    </section>
+    <section id="result" class="result hidden" aria-live="polite"></section>
+  </main>
+  <script type="module" src="/scan.js"></script>
+</body>
+</html>

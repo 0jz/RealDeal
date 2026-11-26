@@ -1,28 +1,18 @@
 // Single-file frontend: no build step. Talks to the Node server over REST + Server-Sent Events.
-const $ = (s) => document.querySelector(s);
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const rsd = (v) => Math.round(v).toLocaleString("en-US") + " RSD";
-const AGENTS = ["PriceFeed", "ThirtyDay", "KP", "CrossShop", "ShopTrust", "Verdict"];
+import { $, esc, rsd, num, srcLink, nums, ctx, openDrawer, openSource, installSourceClicks, statusBadge, STATUS } from "/js/common.js";
+const AGENTS = ["PriceFeed", "ThirtyDay", "KP", "CrossShop", "ShopTrust", "Verdict", "PriceScout"];
 const AGENT_INFO = {
   PriceFeed: "reads the synthetic feed (async file I/O)", ThirtyDay: "30-day rule, sync arithmetic", KP: "LLM loop + worker search",
   CrossShop: "worker: same GTIN across shops", ShopTrust: "LLM loop + worker audit; intercepts Verdict", Verdict: "LLM loop: options + explanation",
+  PriceScout: "scanner runs: LLM loop + worker averages",
 };
 
 let meta = null, run = null, es = null, refetchTimer = null, renderQueued = false;
-const nums = new Map(); let numSeq = 0;
-
-// ---------- sourced numbers ----------
-function num(n, { signed = false, cls = "" } = {}) {
-  if (!n) return "—";
-  const id = "n" + ++numSeq; nums.set(id, n);
-  const txt = n.unit === "%" ? `${n.v}%` : signed && n.v < 0 ? "−" + rsd(Math.abs(n.v)) : rsd(n.v);
-  return `<a href="#" class="num ${cls}" data-num="${id}" title="${esc(n.f)} — click for sources">${esc(txt)}</a>`;
-}
-const srcLink = (ref, label) => `<a href="#" class="src" data-ref="${esc(ref)}">${esc(label ?? ref)}</a>`;
+ctx.getRunId = () => run?.id;
 
 // ---------- boot ----------
 async function boot() {
-  meta = await fetch("/api/meta").then((r) => r.json());
+  meta = await fetch("/api/meta").then((r) => r.json()); ctx.meta = meta;
   $("#list").innerHTML = meta.lists.map((l) => `<option value="${l.id}">${esc(l.name)} (${l.count} items)</option>`).join("");
   $("#mode").className = "mode " + (meta.mode === "llm" ? "llm" : "tpl");
   $("#mode").innerHTML = meta.mode === "llm"
@@ -136,7 +126,7 @@ function renderTimeline() {
   const nowAbs = performance.timeOrigin + performance.now();
   const { map, segs } = buildScale(run.tasks, t0, nowAbs);
   const pctX = (abs) => map(abs - t0);
-  const lanes = AGENTS.map((agent) => {
+  const lanes = AGENTS.filter((a) => a !== "PriceScout" || run.tasks.some((t) => t.agent === a)).map((agent) => {
     const tasks = run.tasks.filter((t) => t.agent === agent).sort((a, b) => a.start - b.start);
     const rows = [];
     for (const t of tasks) {
@@ -180,11 +170,6 @@ const fmtMs = (v) => (v < 1000 ? `${Math.round(v)} ms` : `${(v / 1000).toFixed(2
 function niceStep(x) { const p = 10 ** Math.floor(Math.log10(x)); return [1, 2, 5, 10].map((m) => m * p).find((s) => s >= x); }
 
 // ---------- product cards ----------
-const STATUS = {
-  "likely-violation": ["bad", "Likely violation of the 30-day rule"], "real-discount": ["good", "Real discount"],
-  "no-real-discount": ["warn", "No real discount vs 30-day low"], "no-discount-claimed": ["neutral", "No discount advertised"],
-  "insufficient-history": ["neutral", "Not enough history"],
-};
 function renderCards() {
   const el = $("#cards");
   if (!run?.items?.length) return;
@@ -216,7 +201,6 @@ function renderCards() {
     </article>`;
   }).join("");
 }
-function statusBadge(td) { const [cls, label] = STATUS[td?.status] || ["neutral", td?.status ?? "…"]; return `<span class="badge ${cls}">${esc(label)}</span>`; }
 function optionRow(o, rec, why) {
   const delta = o.saving.v >= 0 ? `saves ${num(o.saving)} vs the ad` : `costs ${num({ ...o.saving, v: -o.saving.v })} more than the ad`;
   const conf = o.confidence;
@@ -254,54 +238,7 @@ function appendLog(e) {
   el.scrollTop = el.scrollHeight;
 }
 
-// ---------- drawer / sources ----------
-function openDrawer(title, html) { $("#drawer-title").textContent = title; $("#drawer-body").innerHTML = html; $("#drawer").classList.remove("hidden"); }
-$("#drawer-close").onclick = () => $("#drawer").classList.add("hidden");
-
-async function openSource(ref) {
-  const s = await fetch(`/api/source?ref=${encodeURIComponent(ref)}&run=${run?.id ?? ""}`).then((r) => (r.ok ? r.json() : null));
-  if (!s) return openDrawer(ref, `<p>Source not found.</p>`);
-  openDrawer(s.title, renderSource(s, ref));
-}
-function renderSource(s, ref) {
-  const file = s.file ? `<p class="muted">Dataset: <code>${esc(s.file)}</code> (synthetic)</p>` : "";
-  if (s.kind === "offer" || s.kind === "kp") return file + kv(s.row) + (s.retailer ? `<p>${esc(s.retailer)} · ${esc(s.product)}</p>` : "");
-  if (s.kind === "hist") return file + chart(s) + `<table class="tbl"><tr><th>Date</th><th>Price</th></tr>${s.series.slice(-35).reverse().map((r) => `<tr class="${r.d === s.highlight ? "hl" : ""} ${r.d >= s.windowFrom ? "" : "dim"}"><td>${r.d}</td><td>${rsd(r.p)}</td></tr>`).join("")}</table>`;
-  if (s.kind === "rule") { const L = s.law; return `<blockquote>${esc(L.quote)}</blockquote><p>${esc(L.translation)}</p><p>${L.urls.map((u) => `<a href="${u}" target="_blank" rel="noopener">${esc(u)}</a>`).join("<br>")}</p><p class="muted">${esc(L.context)}</p><p class="warn-t"><b>Unverified:</b> ${esc(L.unverified)}</p>`; }
-  if (s.kind === "audit") { const a = s.audit; return `<p><b>${a.score}/100</b> ${a.flagged ? "(flagged)" : ""}</p><p class="muted">${esc(a.formula)}</p><table class="tbl"><tr><th>Offer</th><th>Before</th><th>30-day min</th><th>BF</th><th>Status</th></tr>${a.checks.map((c) => `<tr><td>${srcLink("offer:" + c.offerId, c.offerId)}</td><td>${c.before ? rsd(c.before) : "—"}</td><td>${c.min30 ? rsd(c.min30) : "—"}</td><td>${c.bf ? rsd(c.bf) : "—"}</td><td>${esc(c.status)}</td></tr>`).join("")}</table>`; }
-  if (s.kind === "calc") return numberHtml(s.number);
-  if (s.kind === "task" || s.kind === "agent") {
-    const t = s.task; if (!t) return "<p>No task yet.</p>";
-    return `${kv({ agent: t.agent, label: t.label, kind: t.kind, status: t.status, version: t.version, model: t.model, "duration (ms)": t.end ? (t.end - t.start).toFixed(2) : "running", loopId: t.loopId, note: t.note })}
-      <h4>Steps</h4><table class="tbl">${(t.steps || []).map((x) => `<tr><td>${esc(x.kind)}</td><td>${esc(x.label)}</td><td>${x.end ? (x.end - x.start).toFixed(2) + " ms" : "…"}</td></tr>`).join("")}</table>
-      ${t.interception ? `<h4>ShopTrust interception</h4><p>Waited ${t.interception.waitedMs} ms; flagged: ${esc(t.interception.flaggedNames.join(", ") || "none")}</p><p class="muted">compute_options arguments before → after:</p><pre>${esc(JSON.stringify(t.interception.argsBefore, null, 1))}</pre><pre>${esc(JSON.stringify(t.interception.argsAfter, null, 1))}</pre>` : ""}`;
-  }
-  return `<pre>${esc(JSON.stringify(s, null, 2))}</pre>`;
-}
-function numberHtml(n) {
-  return `<p class="bignum">${n.unit === "%" ? n.v + "%" : rsd(n.v)}</p><p><b>How:</b> ${esc(n.f)}</p><h4>Sources</h4><ul>${n.src.map((r) => `<li>${srcLink(r, describeRef(r))}</li>`).join("") || "<li>none</li>"}</ul>`;
-}
-function describeRef(r) {
-  const [k, a, b, c] = r.split(":");
-  const R = (id) => meta.retailers.find((x) => x.id === id)?.name ?? id, P = (id) => meta.products.find((x) => x.id === id)?.name ?? id;
-  return k === "offer" ? `feed offer ${a}` : k === "hist" ? `price history ${P(b)} @ ${R(a)}${c ? " on " + c : ""}` : k === "kp" ? `KP listing ${a}` : k === "rule" ? "Zakon o trgovini čl. 37" : k === "audit" ? `ShopTrust audit of ${R(a)}` : k === "agent" ? `${a} agent output for ${P(b)}` : k === "calc" ? `${a === "fake" ? "fake-discount" : "plan saving"} for ${P(b)}` : r;
-}
-function kv(o) { return `<table class="tbl">${Object.entries(o).filter(([, v]) => v !== undefined && v !== null).map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(typeof v === "number" && k.toLowerCase().includes("price") ? rsd(v) : typeof v === "object" ? JSON.stringify(v) : v)}</td></tr>`).join("")}</table>`; }
-function chart(s) {
-  const W = 420, H = 140, pts = s.series, min = Math.min(...pts.map((p) => p.p)) * 0.97, max = Math.max(...pts.map((p) => p.p)) * 1.02;
-  const x = (i) => (i / (pts.length - 1)) * W, y = (v) => H - ((v - min) / (max - min)) * H;
-  const wi = pts.findIndex((p) => p.d >= s.windowFrom);
-  const hi = pts.findIndex((p) => p.d === s.highlight);
-  return `<svg viewBox="0 0 ${W} ${H + 18}" class="chart"><rect x="${x(Math.max(0, wi))}" y="0" width="${W - x(Math.max(0, wi))}" height="${H}" class="win"/><text x="${x(Math.max(0, wi)) + 4}" y="12" class="wt">30-day window</text>
-    <polyline points="${pts.map((p, i) => `${x(i)},${y(p.p)}`).join(" ")}" class="line"/>${hi >= 0 ? `<circle cx="${x(hi)}" cy="${y(pts[hi].p)}" r="4" class="pt"/>` : ""}
-    <text x="0" y="${H + 14}" class="wt">${pts[0].d}</text><text x="${W}" y="${H + 14}" text-anchor="end" class="wt">${pts.at(-1).d}</text></svg>`;
-}
-
-document.addEventListener("click", (e) => {
-  const n = e.target.closest("[data-num]"); if (n) { e.preventDefault(); const obj = nums.get(n.dataset.num); if (obj) openDrawer("Where this number comes from", numberHtml(obj)); return; }
-  const s = e.target.closest("[data-ref]"); if (s) { e.preventDefault(); openSource(s.dataset.ref); return; }
-  const b = e.target.closest("[data-task]"); if (b) { openSource("task:" + b.dataset.task); }
-});
+installSourceClicks((e) => { const b = e.target.closest("[data-task]"); if (b) openSource("task:" + b.dataset.task); });
 $("#run").onclick = startRun;
 $("#next").onclick = async () => { $("#next").disabled = true; await fetch(`/api/runs/${run.id}/next-page`, { method: "POST" }); };
 boot();

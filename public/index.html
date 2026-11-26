@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Crni Petak Check — is that Black Friday discount real?</title>
+  <meta name="description" content="Mozaik agents check Serbian Black Friday discounts against the 30-day lowest-price rule (Zakon o trgovini, čl. 37). Synthetic demo data." />
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/site.css" />
+</head>
+<body class="site">
+  <header class="nav">
+    <a class="brand" href="/"><span class="logo">%</span><span>Crni Petak Check</span></a>
+    <nav>
+      <a href="#rule">The rule</a><a href="#agents">How it works</a><a href="#checker">Checker</a>
+      <a href="/scan.html" class="nav-scan">Scanner</a><a href="/demo.html" id="hood-link">Under the hood</a>
+    </nav>
+    <div id="mode"></div>
+  </header>
+  <div class="notice" role="note"><b>Demo with synthetic data.</b> Retailers, products, prices and marketplace listings are fictional and generated from a fixed seed. <b>Not financial or legal advice.</b> Every number on this page is computed live by the agents — click any underlined figure to see its source.</div>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <p class="eyebrow">Black Friday · Serbia · 30-day lowest-price rule</p>
+      <h1>Is that <em id="hero-claim">discount</em> real?</h1>
+      <p class="lead">Retailers must compare a discount with their <b>lowest price in the previous 30 days</b>. Our Mozaik agents check every advertised discount against the price history, cross-shop the same product, audit retailer trust and look for sealed listings on the marketplace — then tell you the cheapest honest way to buy.</p>
+      <div class="cta"><a class="btn primary" href="#checker">Check a shopping list</a><a class="btn" href="/scan.html">Scan a product</a></div>
+      <div id="hero-stats" class="hero-stats" aria-live="polite"><div class="loading">The agents are checking the demo feed…</div></div>
+      <p id="hero-foot" class="hero-foot"></p>
+    </div>
+  </section>
+
+  <main class="wrap">
+    <section id="rule" class="section">
+      <h2>The problem</h2>
+      <div class="two">
+        <div>
+          <p>A “before” price can be anything. Shops raise prices in early November, then advertise a huge cut on Black Friday. Serbian law says the reference for a price reduction is the trader’s lowest price in the period before the reduction — so the honest discount is measured from that low, not from the sticker.</p>
+          <div id="law" class="law"></div>
+        </div>
+        <div id="spotlight" class="spot card"><div class="loading">Finding the most inflated ad in the feed…</div></div>
+      </div>
+    </section>
+
+    <section id="agents" class="section">
+      <h2>How it works</h2>
+      <p class="muted">Independent Mozaik agents react to shared events. Results stream in as each agent finishes; when a price changes mid-run, older answers are discarded. ShopTrust can rewrite the Verdict agent’s tool call while it is still running.</p>
+      <div id="agent-grid" class="agent-grid"></div>
+      <div id="run-stats" class="stat-row"></div>
+      <div id="dataset" class="dataset muted"></div>
+    </section>
+
+    <section id="checker" class="section">
+      <div class="sec-head"><h2>Check a shopping list</h2><span class="muted">Runs the full agent team on a list from the synthetic feed.</span></div>
+      <div class="checker-bar card">
+        <label>List <select id="list"></select></label>
+        <button id="run" class="btn primary">Run check</button>
+        <span id="progress" class="progress"><span id="progress-bar"></span></span>
+        <span id="status" class="muted"></span>
+        <a id="hood" class="hood hidden" href="#">Open this run under the hood →</a>
+      </div>
+      <div id="result-headline" class="result-headline hidden"></div>
+      <div id="results" class="results"></div>
+    </section>
+
+    <section class="section">
+      <h2>Retailer trust</h2>
+      <p class="muted">ShopTrust audits every retailer’s Black Friday offers against their own 30-day minimums. Flagged retailers are removed from the recommendations — even when they are the cheapest.</p>
+      <div id="trust" class="trust-grid"></div>
+    </section>
+
+    <section class="section scan-cta card">
+      <div><h2>In a shop? Scan the barcode.</h2><p>On your phone, the scanner reads the EAN-13 barcode and shows the average price in Serbia, the synthetic world reference average and where it is cheapest to buy. Need demo barcodes? <a href="/barcodes.html">Print the test sheet</a>.</p></div>
+      <a class="btn primary" href="/scan.html">Open the scanner</a>
+    </section>
+  </main>
+
+  <footer class="footer wrap">
+    <p><b>Synthetic data · fictional retailers · Not financial or legal advice.</b> “Likely violation of the 30-day rule” is an automated indication from synthetic price histories, not a legal finding. KP = a KupujemProdajem-style marketplace, simulated.</p>
+    <p>Built on <a href="https://www.npmjs.com/package/@mozaik-ai/core" target="_blank" rel="noopener">@mozaik-ai/core</a> for the JigJoy Black Friday AI Hackathon (Finance track). <a href="/demo.html">Under the hood</a> · <a href="/barcodes.html">Demo barcodes</a></p>
+  </footer>
+  <script type="module" src="/site.js"></script>
+</body>
+</html>

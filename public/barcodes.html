@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Demo barcodes — Crni Petak Check</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/site.css" />
+  <style>
+    .sheet { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; padding: 24px 0; }
+    .bc { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px; text-align: center; break-inside: avoid; }
+    .bc svg { max-width: 100%; height: auto; } .bc h3 { margin: 0 0 6px; font-size: 15px; } .bc p { margin: 4px 0 0; }
+    @media print { .nav, .notice, .noprint { display: none !important; } body.site { background: #fff; } .bc { border-color: #ccc; } }
+  </style>
+</head>
+<body class="site">
+  <header class="nav"><a class="brand" href="/"><span class="logo">%</span><span>Crni Petak Check</span></a><nav><a href="/">Site</a><a href="/scan.html" class="nav-scan">Scanner</a></nav></header>
+  <div class="notice"><b>Synthetic test barcodes.</b> EAN-13 codes in the GS1 “restricted circulation” range (prefix 200–299), so they never collide with real products. Products and prices are fictional. Not financial advice.</div>
+  <main class="wrap">
+    <div class="section noprint"><h2>Demo barcodes</h2><p>Open <a href="/scan.html">the scanner</a> on your phone and point it at one of these (on screen or printed). <button class="btn" onclick="print()">Print this sheet</button></p></div>
+    <div id="sheet" class="sheet"><div class="loading">Loading products…</div></div>
+  </main>
+  <script type="module">
+    import { ean13Svg } from "/js/ean13.js";
+    import { esc } from "/js/common.js";
+    const products = await fetch("/api/products").then((r) => r.json());
+    document.getElementById("sheet").innerHTML = products.map((p) => `<div class="bc" data-ean="${p.ean13}"><h3>${esc(p.name)}</h3>${ean13Svg(p.ean13)}<p class="muted small">${esc(p.category)} · <a href="/scan.html?code=${p.ean13}">scan result</a></p></div>`).join("");
+  </script>
+</body>
+</html>
