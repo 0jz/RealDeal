@@ -1,0 +1,135 @@
+[
+  {
+    "id": "family",
+    "name": "Family Black Friday list",
+    "note": "Ads the shopper saw (synthetic)",
+    "items": [
+      {
+        "productId": "p02",
+        "retailerId": "r5"
+      },
+      {
+        "productId": "p04",
+        "retailerId": "r5"
+      },
+      {
+        "productId": "p08",
+        "retailerId": "r5"
+      },
+      {
+        "productId": "p03",
+        "retailerId": "r3"
+      },
+      {
+        "productId": "p11",
+        "retailerId": "r3"
+      },
+      {
+        "productId": "p09",
+        "retailerId": "r1"
+      },
+      {
+        "productId": "p14",
+        "retailerId": "r4"
+      }
+    ]
+  },
+  {
+    "id": "tech",
+    "name": "Tech upgrades list",
+    "note": "Ads the shopper saw (synthetic)",
+    "items": [
+      {
+        "productId": "p01",
+        "retailerId": "r5"
+      },
+      {
+        "productId": "p05",
+        "retailerId": "r1"
+      },
+      {
+        "productId": "p06",
+        "retailerId": "r3"
+      },
+      {
+        "productId": "p10",
+        "retailerId": "r4"
+      },
+      {
+        "productId": "p12",
+        "retailerId": "r5"
+      },
+      {
+        "productId": "p13",
+        "retailerId": "r3"
+      },
+      {
+        "productId": "p07",
+        "retailerId": "r2"
+      }
+    ]
+  },
+  {
+    "id": "all",
+    "name": "Everything in the feed",
+    "note": "Each product at its featured ad",
+    "items": [
+      {
+        "productId": "p01",
+        "retailerId": "r5"
+      },
+      {
+        "productId": "p02",
+        "retailerId": "r5"
+      },
+      {
+        "productId": "p03",
+        "retailerId": "r3"
+      },
+      {
+        "productId": "p04",
+        "retailerId": "r5"
+      },
+      {
+        "productId": "p05",
+        "retailerId": "r1"
+      },
+      {
+        "productId": "p06",
+        "retailerId": "r3"
+      },
+      {
+        "productId": "p07",
+        "retailerId": "r2"
+      },
+      {
+        "productId": "p08",
+        "retailerId": "r5"
+      },
+      {
+        "productId": "p09",
+        "retailerId": "r1"
+      },
+      {
+        "productId": "p10",
+        "retailerId": "r4"
+      },
+      {
+        "productId": "p11",
+        "retailerId": "r3"
+      },
+      {
+        "productId": "p12",
+        "retailerId": "r5"
+      },
+      {
+        "productId": "p13",
+        "retailerId": "r3"
+      },
+      {
+        "productId": "p14",
+        "retailerId": "r4"
+      }
+    ]
+  }
+]

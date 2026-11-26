@@ -1,0 +1,10 @@
+{
+  "synthetic": true,
+  "seed": 20261127,
+  "generatedBy": "scripts/generate-data.js",
+  "bfDate": "2026-11-27",
+  "historyFrom": "2026-09-28",
+  "historyTo": "2026-11-26",
+  "currency": "RSD",
+  "note": "All retailers, products, prices and listings are fictional and generated from a fixed seed."
+}

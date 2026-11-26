@@ -1,0 +1,100 @@
+[
+  {
+    "id": "p01",
+    "name": "Orbis Phone 12 128GB",
+    "category": "Phones",
+    "gtin": "SYN860000001013",
+    "featuredRetailer": "r5"
+  },
+  {
+    "id": "p02",
+    "name": "Lumen 55\" 4K TV QL55",
+    "category": "TV",
+    "gtin": "SYN860000002026",
+    "featuredRetailer": "r5"
+  },
+  {
+    "id": "p03",
+    "name": "Vetra Robot Vacuum S7",
+    "category": "Home",
+    "gtin": "SYN860000003039",
+    "featuredRetailer": "r3"
+  },
+  {
+    "id": "p04",
+    "name": "Kora Air Fryer XL 6L",
+    "category": "Kitchen",
+    "gtin": "SYN860000004052",
+    "featuredRetailer": "r5"
+  },
+  {
+    "id": "p05",
+    "name": "Nimbus Laptop 14 16GB 512GB",
+    "category": "Laptops",
+    "gtin": "SYN860000005065",
+    "featuredRetailer": "r1"
+  },
+  {
+    "id": "p06",
+    "name": "Sonar H900 ANC Headphones",
+    "category": "Audio",
+    "gtin": "SYN860000006078",
+    "featuredRetailer": "r3"
+  },
+  {
+    "id": "p07",
+    "name": "Pixa Z50 Mirrorless Camera Kit",
+    "category": "Cameras",
+    "gtin": "SYN860000007091",
+    "featuredRetailer": "r2"
+  },
+  {
+    "id": "p08",
+    "name": "Brio B2 Espresso Machine",
+    "category": "Kitchen",
+    "gtin": "SYN860000008104",
+    "featuredRetailer": "r5"
+  },
+  {
+    "id": "p09",
+    "name": "Atlas Game Console 1TB",
+    "category": "Gaming",
+    "gtin": "SYN860000009117",
+    "featuredRetailer": "r1"
+  },
+  {
+    "id": "p10",
+    "name": "Flux W3 Smartwatch",
+    "category": "Wearables",
+    "gtin": "SYN860000010130",
+    "featuredRetailer": "r4"
+  },
+  {
+    "id": "p11",
+    "name": "Kora Stick Blender 1000W",
+    "category": "Kitchen",
+    "gtin": "SYN860000011143",
+    "featuredRetailer": "r3"
+  },
+  {
+    "id": "p12",
+    "name": "Tera External SSD 2TB",
+    "category": "Storage",
+    "gtin": "SYN860000012156",
+    "featuredRetailer": "r5"
+  },
+  {
+    "id": "p13",
+    "name": "Orbis Tablet 11 128GB",
+    "category": "Tablets",
+    "gtin": "SYN860000013169",
+    "featuredRetailer": "r3"
+  },
+  {
+    "id": "p14",
+    "name": "Vetra V12 Cordless Vacuum",
+    "category": "Home",
+    "gtin": "SYN860000014182",
+    "featuredRetailer": "r4"
+  }
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "o2-r4-p01",
+    "page": 2,
+    "retailerId": "r4",
+    "productId": "p01",
+    "advertisedBefore": 61499,
+    "bfPrice": 54999,
+    "publishedAt": "2026-11-27T00:20:00+01:00",
+    "replaces": "o1-r4-p01"
+  },
+  {
+    "id": "o2-r2-p12",
+    "page": 2,
+    "retailerId": "r2",
+    "productId": "p12",
+    "advertisedBefore": null,
+    "bfPrice": 18999,
+    "publishedAt": "2026-11-27T00:25:00+01:00",
+    "replaces": "o1-r2-p12"
+  },
+  {
+    "id": "o2-r1-p09",
+    "page": 2,
+    "retailerId": "r1",
+    "productId": "p09",
+    "advertisedBefore": 64499,
+    "bfPrice": 61499,
+    "publishedAt": "2026-11-27T00:30:00+01:00",
+    "replaces": "o1-r1-p09"
+  },
+  {
+    "id": "o2-r2-p02",
+    "page": 2,
+    "retailerId": "r2",
+    "productId": "p02",
+    "advertisedBefore": null,
+    "bfPrice": 58499,
+    "publishedAt": "2026-11-27T00:35:00+01:00",
+    "replaces": "o1-r2-p02"
+  }
+]

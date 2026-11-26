@@ -1,0 +1,344 @@
+[
+  {
+    "id": "o1-r1-p01",
+    "page": 1,
+    "retailerId": "r1",
+    "productId": "p01",
+    "advertisedBefore": 63999,
+    "bfPrice": 55999,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r4-p01",
+    "page": 1,
+    "retailerId": "r4",
+    "productId": "p01",
+    "advertisedBefore": 61499,
+    "bfPrice": 55499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r5-p01",
+    "page": 1,
+    "retailerId": "r5",
+    "productId": "p01",
+    "advertisedBefore": 87999,
+    "bfPrice": 53999,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r2-p02",
+    "page": 1,
+    "retailerId": "r2",
+    "productId": "p02",
+    "advertisedBefore": null,
+    "bfPrice": 60499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r3-p02",
+    "page": 1,
+    "retailerId": "r3",
+    "productId": "p02",
+    "advertisedBefore": 59499,
+    "bfPrice": 53499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r5-p02",
+    "page": 1,
+    "retailerId": "r5",
+    "productId": "p02",
+    "advertisedBefore": 81499,
+    "bfPrice": 51999,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r1-p03",
+    "page": 1,
+    "retailerId": "r1",
+    "productId": "p03",
+    "advertisedBefore": 34999,
+    "bfPrice": 31499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r3-p03",
+    "page": 1,
+    "retailerId": "r3",
+    "productId": "p03",
+    "advertisedBefore": 39499,
+    "bfPrice": 31999,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r4-p03",
+    "page": 1,
+    "retailerId": "r4",
+    "productId": "p03",
+    "advertisedBefore": 34499,
+    "bfPrice": 30999,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r2-p04",
+    "page": 1,
+    "retailerId": "r2",
+    "productId": "p04",
+    "advertisedBefore": 11999,
+    "bfPrice": 10499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r3-p04",
+    "page": 1,
+    "retailerId": "r3",
+    "productId": "p04",
+    "advertisedBefore": 11999,
+    "bfPrice": 10999,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r5-p04",
+    "page": 1,
+    "retailerId": "r5",
+    "productId": "p04",
+    "advertisedBefore": 16499,
+    "bfPrice": 9999,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r1-p05",
+    "page": 1,
+    "retailerId": "r1",
+    "productId": "p05",
+    "advertisedBefore": 88999,
+    "bfPrice": 80499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r2-p05",
+    "page": 1,
+    "retailerId": "r2",
+    "productId": "p05",
+    "advertisedBefore": null,
+    "bfPrice": 89999,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r4-p05",
+    "page": 1,
+    "retailerId": "r4",
+    "productId": "p05",
+    "advertisedBefore": 85999,
+    "bfPrice": 78499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r3-p06",
+    "page": 1,
+    "retailerId": "r3",
+    "productId": "p06",
+    "advertisedBefore": 31999,
+    "bfPrice": 24499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r4-p06",
+    "page": 1,
+    "retailerId": "r4",
+    "productId": "p06",
+    "advertisedBefore": null,
+    "bfPrice": 23999,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r5-p06",
+    "page": 1,
+    "retailerId": "r5",
+    "productId": "p06",
+    "advertisedBefore": 34499,
+    "bfPrice": 23499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r1-p07",
+    "page": 1,
+    "retailerId": "r1",
+    "productId": "p07",
+    "advertisedBefore": 106999,
+    "bfPrice": 98499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r2-p07",
+    "page": 1,
+    "retailerId": "r2",
+    "productId": "p07",
+    "advertisedBefore": 112999,
+    "bfPrice": 97499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r2-p08",
+    "page": 1,
+    "retailerId": "r2",
+    "productId": "p08",
+    "advertisedBefore": 40999,
+    "bfPrice": 36499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r4-p08",
+    "page": 1,
+    "retailerId": "r4",
+    "productId": "p08",
+    "advertisedBefore": 37999,
+    "bfPrice": 32499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r5-p08",
+    "page": 1,
+    "retailerId": "r5",
+    "productId": "p08",
+    "advertisedBefore": 54499,
+    "bfPrice": 31499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r1-p09",
+    "page": 1,
+    "retailerId": "r1",
+    "productId": "p09",
+    "advertisedBefore": 64499,
+    "bfPrice": 59499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r3-p09",
+    "page": 1,
+    "retailerId": "r3",
+    "productId": "p09",
+    "advertisedBefore": 63999,
+    "bfPrice": 55499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r4-p09",
+    "page": 1,
+    "retailerId": "r4",
+    "productId": "p09",
+    "advertisedBefore": null,
+    "bfPrice": 63499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r2-p10",
+    "page": 1,
+    "retailerId": "r2",
+    "productId": "p10",
+    "advertisedBefore": 21999,
+    "bfPrice": 18499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r4-p10",
+    "page": 1,
+    "retailerId": "r4",
+    "productId": "p10",
+    "advertisedBefore": 20999,
+    "bfPrice": 19499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r1-p11",
+    "page": 1,
+    "retailerId": "r1",
+    "productId": "p11",
+    "advertisedBefore": 5999,
+    "bfPrice": 5499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r3-p11",
+    "page": 1,
+    "retailerId": "r3",
+    "productId": "p11",
+    "advertisedBefore": 7499,
+    "bfPrice": 5999,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r2-p12",
+    "page": 1,
+    "retailerId": "r2",
+    "productId": "p12",
+    "advertisedBefore": null,
+    "bfPrice": 18499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r4-p12",
+    "page": 1,
+    "retailerId": "r4",
+    "productId": "p12",
+    "advertisedBefore": 17499,
+    "bfPrice": 14999,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r5-p12",
+    "page": 1,
+    "retailerId": "r5",
+    "productId": "p12",
+    "advertisedBefore": 24499,
+    "bfPrice": 14499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r1-p13",
+    "page": 1,
+    "retailerId": "r1",
+    "productId": "p13",
+    "advertisedBefore": 44999,
+    "bfPrice": 39499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r3-p13",
+    "page": 1,
+    "retailerId": "r3",
+    "productId": "p13",
+    "advertisedBefore": 44499,
+    "bfPrice": 39999,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r1-p14",
+    "page": 1,
+    "retailerId": "r1",
+    "productId": "p14",
+    "advertisedBefore": 48999,
+    "bfPrice": 44499,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r2-p14",
+    "page": 1,
+    "retailerId": "r2",
+    "productId": "p14",
+    "advertisedBefore": null,
+    "bfPrice": 50999,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  },
+  {
+    "id": "o1-r4-p14",
+    "page": 1,
+    "retailerId": "r4",
+    "productId": "p14",
+    "advertisedBefore": 48999,
+    "bfPrice": 43999,
+    "publishedAt": "2026-11-27T00:00:00+01:00"
+  }
+]
