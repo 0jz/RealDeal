@@ -106,39 +106,68 @@ function openBreakdown() {
 }
 
 // ---------- timeline ----------
+// Time axis with idle gaps (e.g. waiting for a button click) compressed, so every burst of agent work stays readable.
+function buildScale(tasks, t0, nowAbs) {
+  const iv = tasks.map((t) => [t.start - t0, (t.end ?? nowAbs) - t0]).sort((a, b) => a[0] - b[0]);
+  const busy = [];
+  for (const [a, b] of iv) { const last = busy.at(-1); if (last && a <= last[1] + 80) last[1] = Math.max(last[1], b); else busy.push([a, b]); }
+  if (!busy.length) busy.push([0, 10]);
+  busy[0][0] = 0;
+  const GAP = 4; // % of width per compressed gap
+  const total = busy.reduce((s, [a, b]) => s + (b - a), 0) * 1.03 || 1;
+  const avail = 100 - GAP * (busy.length - 1);
+  const segs = []; let x = 0;
+  busy.forEach(([a, b], i) => { const w = ((b - a) / total) * avail; segs.push({ a, b, x, w }); x += w + (i < busy.length - 1 ? GAP : 0); });
+  const map = (rel) => {
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i];
+      if (rel <= s.b || i === segs.length - 1) return rel < s.a ? s.x : s.x + ((rel - s.a) / Math.max(0.001, s.b - s.a)) * s.w;
+      if (rel < segs[i + 1].a) return s.x + s.w + GAP / 2;
+    }
+    return 100;
+  };
+  return { map, segs };
+}
+
 function renderTimeline() {
   if (!run) return;
   const el = $("#timeline");
   const t0 = run.startedAt;
-  const ends = run.tasks.map((t) => (t.end ?? performance.timeOrigin + performance.now()) - t0);
-  const span = Math.max(10, ...ends) * 1.04;
-  const pctX = (abs) => ((abs - t0) / span) * 100;
+  const nowAbs = performance.timeOrigin + performance.now();
+  const { map, segs } = buildScale(run.tasks, t0, nowAbs);
+  const pctX = (abs) => map(abs - t0);
   const lanes = AGENTS.map((agent) => {
     const tasks = run.tasks.filter((t) => t.agent === agent).sort((a, b) => a.start - b.start);
     const rows = [];
     for (const t of tasks) {
-      const end = t.end ?? Infinity;
-      let r = rows.findIndex((rowEnd) => rowEnd <= t.start - span * 0.002);
-      if (r < 0) { rows.push(end); r = rows.length - 1; } else rows[r] = end;
-      t._row = r;
+      const l = pctX(t.start), r = Math.max(pctX(t.end ?? nowAbs), l + 0.3);
+      let row = rows.findIndex((rowEnd) => rowEnd <= l - 0.1);
+      if (row < 0) { rows.push(r); row = rows.length - 1; } else rows[row] = r;
+      t._row = row;
     }
     const height = Math.max(1, rows.length);
     const bars = tasks.map((t) => {
-      const endAbs = t.end ?? t0 + span / 1.04;
-      const left = pctX(t.start), width = Math.max(0.25, pctX(endAbs) - left);
-      const segs = (t.steps || []).map((s) => {
-        const sl = ((s.start - t.start) / Math.max(0.001, endAbs - t.start)) * 100;
-        const sw = (((s.end ?? endAbs) - s.start) / Math.max(0.001, endAbs - t.start)) * 100;
+      const endAbs = t.end ?? nowAbs;
+      const left = pctX(t.start), width = Math.max(0.3, pctX(endAbs) - left);
+      const span = Math.max(0.001, endAbs - t.start);
+      const segsHtml = (t.steps || []).map((s) => {
+        const sl = ((s.start - t.start) / span) * 100;
+        const sw = (((s.end ?? endAbs) - s.start) / span) * 100;
         return `<i class="seg seg-${s.kind}" style="left:${sl}%;width:${Math.max(0.5, sw)}%" title="${esc(s.label)}: ${((s.end ?? endAbs) - s.start).toFixed(1)} ms"></i>`;
       }).join("");
-      const dur = ((t.end ?? endAbs) - t.start).toFixed(1);
+      const dur = (endAbs - t.start).toFixed(1);
       const cls = [`bar`, `k-${t.kind}`, `s-${t.status}`, t.stale ? "stale" : "", t.interception?.changed ? "intercepted" : ""].join(" ");
-      return `<div class="${cls}" data-task="${t.id}" style="left:${left}%;width:${width}%;top:${t._row * 22}px" title="${esc(t.label)} · ${dur} ms · ${esc(t.status)}${t.note ? " · " + esc(t.note) : ""}">${segs}<span>${esc(t.label)}${t.status === "superseded" ? " (superseded)" : ""}${t.interception?.changed ? " ⚡" : ""}</span></div>`;
+      return `<div class="${cls}" data-task="${t.id}" style="left:${left}%;width:${width}%;top:${t._row * 22}px" title="${esc(t.label)} · ${dur} ms · ${esc(t.status)}${t.note ? " · " + esc(t.note) : ""}">${segsHtml}<span>${esc(t.label)}${t.status === "superseded" ? " (superseded)" : ""}${t.interception?.changed ? " ⚡" : ""}</span></div>`;
     }).join("");
-    return `<div class="lane"><div class="lane-name"><b>${agent}</b><small>${AGENT_INFO[agent]}</small></div><div class="lane-track" style="height:${height * 22 + 4}px">${bars}</div></div>`;
+    const breaks = segs.slice(1).map((s) => `<i class="gap" style="left:${s.x - 4}%;width:4%"></i>`).join("");
+    return `<div class="lane"><div class="lane-name"><b>${agent}</b><small>${AGENT_INFO[agent]}</small></div><div class="lane-track" style="height:${height * 22 + 4}px">${breaks}${bars}</div></div>`;
   }).join("");
-  const step = niceStep(span / 8);
-  const ticks = []; for (let x = 0; x <= span; x += step) ticks.push(`<span style="left:${(x / span) * 100}%">${x < 1000 ? Math.round(x) + " ms" : (x / 1000).toFixed(1) + " s"}</span>`);
+  const ticks = [];
+  segs.forEach((s, i) => {
+    const len = s.b - s.a, step = niceStep(len / Math.max(1, Math.round(s.w / 14)));
+    for (let v = Math.ceil(s.a / step) * step; v <= s.b; v += step) ticks.push(`<span style="left:${map(v)}%">${fmtMs(v)}</span>`);
+    if (i > 0) ticks.push(`<span class="gapl" style="left:${s.x - 2}%">idle ${fmtMs(s.a - segs[i - 1].b)}</span>`);
+  });
   el.innerHTML = `${lanes}<div class="axis"><div class="lane-name"></div><div class="ticks">${ticks.join("")}</div></div>`;
   const asyncTasks = run.tasks.filter((t) => t.kind !== "sync");
   const ev = asyncTasks.flatMap((t) => [[t.start, 1], [t.end ?? Infinity, -1]]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -147,6 +176,7 @@ function renderTimeline() {
   const inter = run.tasks.filter((t) => t.interception?.changed).length;
   $("#tl-stats").innerHTML = `<span>peak concurrency <b>${peak}</b> async tasks</span><span><b>${run.tasks.length}</b> tasks</span><span><b>${sup}</b> superseded</span><span><b>${inter}</b> Verdict loops rewritten by ShopTrust</span>`;
 }
+const fmtMs = (v) => (v < 1000 ? `${Math.round(v)} ms` : `${(v / 1000).toFixed(2)} s`);
 function niceStep(x) { const p = 10 ** Math.floor(Math.log10(x)); return [1, 2, 5, 10].map((m) => m * p).find((s) => s >= x); }
 
 // ---------- product cards ----------

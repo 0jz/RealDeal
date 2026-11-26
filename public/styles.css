@@ -136,3 +136,5 @@ blockquote { margin: 0 0 8px; padding: 6px 10px; border-left: 3px solid #cbd5e1;
 .warn-t { color: var(--amber); }
 .chart { width: 100%; height: auto; } .chart .line { fill: none; stroke: var(--blue); stroke-width: 2; } .chart .win { fill: #fef3c7; } .chart .pt { fill: var(--red); } .chart .wt { font-size: 10px; fill: var(--muted); }
 .foot { margin: 0 24px 24px; font-size: 12px; } .foot p { margin: 4px 0; }
+.lane-track .gap { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, #e5e7eb 0 2px, transparent 2px 6px); }
+.ticks .gapl { color: #9ca3af; font-style: italic; transform: translateX(-50%); }
