@@ -161,6 +161,8 @@ function ChipEditor({ label, children }: { label: string; children: () => ReactN
 	const button = useRef<HTMLButtonElement>(null)
 	const pop = useRef<HTMLDivElement>(null)
 
+	// A swap or edit renames the chip: the change is applied, so close.
+	useEffect(() => setOpen(false), [label])
 	useEffect(() => {
 		if (!open) return
 		pop.current?.focus()

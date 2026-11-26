@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { randomUUID } from "node:crypto"
 import { EventTypeIs } from "../agents/kit"
-import { applyRisks, buildOffers, cashBalance, checkRisks, eligible, emptyLedger, estimateResale, money, optimize, reserved, total, transact, validateGoal, type RiskCheck } from "./model"
+import { applyRisks, buildOffers, matchProduct, cashBalance, checkRisks, eligible, emptyLedger, estimateResale, money, optimize, reserved, total, transact, validateGoal, type RiskCheck } from "./model"
 import { choose } from "./choose"
 import { interpret } from "./interpret"
 import { MAX_PROMPT } from "./prompt"
@@ -246,7 +246,8 @@ export async function createGoalFromPrompt(input: unknown): Promise<FinanceView>
 	const created = createGoal(chosen.goal)
 	const s = state.sessions.get(created.id)!
 	s.view.intent = { ...parsed, budget }
-	s.view.alternatives = chosen.alternatives
+	// Keep the chosen product in its own list so the user can swap back to it later.
+	s.view.alternatives = Object.fromEntries(chosen.goal.wishes.map(w => { const own = matchProduct(w.name); const alts = chosen.alternatives[w.id] ?? []; return [w.id, own && !alts.includes(own) ? [own, ...alts] : alts] }))
 	save(s)
 	return snapshot(s)
 }

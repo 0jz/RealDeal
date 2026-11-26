@@ -93,7 +93,7 @@ test("catalogue estimate with unknown delivery: a warning, not a block, and it c
 	assert.ok(o.risks.includes("Delivery not known yet; add it when you pick a shop"))
 	const p = plan(g)
 	assert.ok(p.selectedOffers.includes("phone"))
-	assert.equal(p.actions.find(a => a.id === "phone")!.why, "Typical price (estimate); delivery not known yet.")
+	assert.equal(p.actions.find(a => a.id === "phone")!.why, "Delivery not known yet; add it when you pick a shop.")
 })
 test("catalogue estimate far below typical is not blocked by the too-cheap check", () => {
 	const g = withWish({ ...G, cash: 1000000 }, "phone", { price: 30000, priceSource: "catalogue" })

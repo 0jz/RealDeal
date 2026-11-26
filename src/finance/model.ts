@@ -142,7 +142,7 @@ export function optimize(g: Goal, l: Ledger, offers: Offer[], resale: Resale[]):
 	const actions: Plan["actions"] = best.sells.map(r => ({ kind: "sell", id: r.assetId, name: g.assets.find(a => a.id === r.assetId)!.name, amount: r.net, when: `About ${r.days} days; wait for the money before buying`, why: r.basis === "your price" ? "Your expected price, minus fees and delivery." : "No price entered: rough estimate from the typical new price. Enter your own for a better plan." }))
 	for (const o of best.buys) {
 		const vs = o.typicalPrice && o.condition === "new" ? ` Typical new price is about ${o.typicalPrice.toLocaleString("sr-RS")} RSD.` : ""
-		const why = o.priceSource === "catalogue" ? "Typical price (estimate); delivery not known yet." : `${o.shop || "Shop not named"}, delivery included, ${o.warrantyMonths}-month warranty (${o.condition}).${vs}`
+		const why = o.priceSource === "catalogue" ? "Delivery not known yet; add it when you pick a shop." : `${o.shop || "Shop not named"}, ${deliveryPending(o) ? "delivery not known yet" : "delivery included"}, ${o.warrantyMonths}-month warranty (${o.condition}).${vs}`
 		actions.push({ kind: "buy", id: o.id, name: o.name, amount: total(o), when: conditional ? "After the sale money arrives" : "You can afford it now", why })
 	}
 	for (const w of wishes) if (!best.buys.some(o => o.wishId === w.id)) {
