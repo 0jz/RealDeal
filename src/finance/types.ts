@@ -52,6 +52,8 @@ export type Plan = {
 }
 export type AgentRun = {
 	id: number; agent: string; revision: number; cycle: number; startedAt: string; finishedAt?: string
+	/** performance.now() when the run was launched; startMs is when inference actually began. */
+	queuedMs?: number
 	startMs: number; endMs?: number; status: "running" | "accepted" | "stale" | "error"
 	mode: "offline analysis" | "LLM reasoning"; detail?: string
 }

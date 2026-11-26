@@ -245,6 +245,7 @@ function buildRow(s: Session, key: string): ResultRow | null {
 		condition: (matched.condition ?? listing.condition ?? null) as Condition | null,
 		city: listing.city ?? null,
 		shopName: listing.shopName ?? null,
+		image: listing.image ?? null,
 		storageGb: matched.storageGb ?? null,
 		productId: matched.productId!,
 		confidence: matched.confidence,

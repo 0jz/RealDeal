@@ -8,6 +8,7 @@ function row(overrides: Partial<ResultRow> = {}): ResultRow {
 		key: "kp|1",
 		source: "kp",
 		sourceName: "KupujemProdajem",
+		image: null,
 		kind: "classified",
 		title: "iPhone 15 Pro 256GB",
 		url: "https://example.com/oglas/1",

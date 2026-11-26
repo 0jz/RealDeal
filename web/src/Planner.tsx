@@ -1,9 +1,15 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react"
 import type { Asset, Command, FinanceView, Goal, Intent, Wish } from "../../src/finance/types"
 import { motion, useReducedMotion } from "motion/react"
-import { LiveLog, settled } from "./LiveLog"
+import { toast } from "sonner"
+import { LiveLog, PlanDetails, settled } from "./LiveLog"
+import { BestPick } from "./BestPick"
+import { useListings } from "./useListings"
+import { Toaster } from "./components/ui/sonner"
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "./components/ui/dialog"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./components/ui/collapsible"
 import { Landing, SiteNav } from "./Landing"
-import { blankDraft, CommandError, followPlan, FinanceForm, planIdFromUrl, PlanResult, priceLabel, rsd, sendCommand, setPlanInUrl, toDraft, type Draft, type Product } from "./Finance"
+import { blankDraft, CommandError, followPlan, FinanceForm, planIdFromUrl, priceLabel, TrackPanel, rsd, sendCommand, setPlanInUrl, toDraft, type Draft, type Product } from "./Finance"
 
 const MAX_CHARS = 1000
 const WARN_CHARS = 800
@@ -99,20 +105,29 @@ export function Planner() {
 	}, [phase])
 
 	/** Sends a change to the open plan. The draft follows the goal the server accepted. */
-	async function send(cmd: Command) {
-		if (!view) return
+	async function send(cmd: Command): Promise<boolean> {
+		if (!view) return false
 		const gen = generation.current
 		setBusy(true); setError("")
 		try {
 			const next = await sendCommand(view, cmd)
-			if (gen !== generation.current) return
+			if (gen !== generation.current) return false
 			adopt(next); setDraft(toDraft(next.goal))
+			return true
 		} catch (e) {
 			if (gen === generation.current) {
 				if (e instanceof CommandError && e.view) accept(e.view)
 				setError(e instanceof Error ? e.message : String(e))
 			}
 		} finally { if (gen === generation.current) setBusy(false) }
+		return false
+	}
+
+	async function share() {
+		const url = location.href
+		if (navigator.share) { try { await navigator.share({ title: "My RealDeal plan", url }) } catch { /* closed */ } return }
+		try { await navigator.clipboard.writeText(url); toast("Link copied. Anyone with this link can see and change this plan.") }
+		catch { toast("Copy this link to come back later: " + url) }
 	}
 
 	function newPlan() {
@@ -120,6 +135,9 @@ export function Planner() {
 		history.replaceState(null, "", ASK_PATH)
 		setView(null); setKept(null); setPhase("idle"); setDraft(blankDraft()); setEditing(false); setText(""); setError(""); setMiss(null); setSaleAmounts({}); setBusy(false); setPlanInUrl(null)
 	}
+
+	const picks = view ? picksOf(view, catalogue, kept) : []
+	const listings = useListings(picks.flatMap(p => [p.product, ...p.alternatives]).filter((p): p is Product => !!p))
 
 	const onPromptKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
 		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void plan() }
@@ -158,32 +176,63 @@ export function Planner() {
 	const alternativesFor = (wish: Wish) => (kept?.alternatives[wish.id] ?? [])
 		.map(id => catalogue.find(p => p.id === id))
 		.filter((p): p is Product => !!p && p.name !== wish.name)
+	const applyGoal = (goal: Goal) => void send({ type: "update-goal", goal: retitle(view.goal, goal) })
+	const sellFirst = view.plan.conditional ? view.plan.actions.filter(a => a.kind === "sell").map(a => a.name) : []
 
-	return <><SiteNav action={<button type="button" className="ghost" onClick={newPlan}>New plan</button>} />
+	const understood = <section className="understood" aria-label="What I understood">
+		<div className="group-head"><h2>What I understood</h2><span className="note">Tap a chip to change it. The plan updates right away.</span></div>
+		<ul className="chip-row">
+			{view.goal.wishes.map(w => <ChipEditor key={w.id} label={`buy: ${w.name}`}>
+				{() => <WishEditor wish={w} goal={view.goal} options={alternativesFor(w)} busy={busy} onApply={applyGoal} />}
+			</ChipEditor>)}
+			{view.goal.assets.map(a => <ChipEditor key={a.id} label={`sell: ${a.name}, ${a.condition}`}>
+				{() => <AssetEditor asset={a} goal={view.goal} busy={busy} onApply={applyGoal} />}
+			</ChipEditor>)}
+		</ul>
+		<Collapsible open={editing} onOpenChange={setEditing}>
+			<CollapsibleTrigger asChild><button type="button" className="ghost">{editing ? "Hide details" : "Edit details"}</button></CollapsibleTrigger>
+			<CollapsibleContent><FinanceForm draft={draft} setDraft={setDraft} products={catalogue} view={view} busy={busy} onSubmit={goal => void send({ type: "update-goal", goal })} /></CollapsibleContent>
+		</Collapsible>
+	</section>
+
+	const actions = <>
+		<Dialog>
+			<DialogTrigger asChild><button type="button" className="ghost">Track what you did</button></DialogTrigger>
+			<DialogContent className="max-h-[85vh] overflow-y-auto border-[var(--rule)] bg-[var(--sheet)] text-[var(--ink)] sm:max-w-xl">
+				<DialogTitle>Track what you did</DialogTitle>
+				<DialogDescription className="text-[var(--muted)]">Tell RealDeal what you sold or bought, and the plan updates.</DialogDescription>
+				<TrackPanel view={view} busy={busy} saleAmounts={saleAmounts} setSaleAmounts={setSaleAmounts} command={cmd => void send(cmd).then(ok => { if (ok) toast("Saved. Your plan is updated.") })} />
+			</DialogContent>
+		</Dialog>
+		<button type="button" className="ghost" onClick={() => void share()}>Share</button>
+		<button type="button" className="ghost" onClick={newPlan}>New plan</button>
+	</>
+
+	return <><SiteNav action={actions} />
+	<Toaster position="bottom-center" style={{ "--normal-bg": "var(--sheet)", "--normal-text": "var(--ink)", "--normal-border": "var(--rule)" } as React.CSSProperties} />
 	<motion.div className="page finance-page planner-page" initial={phase === "revealed" && !reduce ? { opacity: 0, y: 12 } : false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}>
 		{error && <p className="alert" role="alert">{error}</p>}
-		{phase === "revealed" && <LiveLog view={view} collapsed />}
+		<PlanDetails view={view} understood={understood} />
 
-		<section className="understood" aria-label="What I understood">
-			<div className="group-head"><h2>What I understood</h2><span className="note">Tap a chip to change it. The plan updates right away.</span></div>
-			<ul className="chip-row">
-				{view.goal.wishes.map(w => <ChipEditor key={w.id} label={`buy: ${w.name}`}>
-					{() => <WishEditor wish={w} goal={view.goal} options={alternativesFor(w)} busy={busy} onApply={goal => void send({ type: "update-goal", goal: retitle(view.goal, goal) })} />}
-				</ChipEditor>)}
-				{view.goal.assets.map(a => <ChipEditor key={a.id} label={`sell: ${a.name}, ${a.condition}`}>
-					{() => <AssetEditor asset={a} goal={view.goal} busy={busy} onApply={goal => void send({ type: "update-goal", goal: retitle(view.goal, goal) })} />}
-				</ChipEditor>)}
-			</ul>
+		<section aria-labelledby="plan-headline">
+			<h1 id="plan-headline" className="scroll-mt-32">Buy what fits now.</h1>
+			{picks.map(({ wish, product, alternatives }) => <BestPick key={wish.id} wish={wish} product={product} alternatives={alternatives} listings={listings} busy={busy} sellFirst={sellFirst}
+				onSwap={p => applyGoal({ ...view.goal, wishes: view.goal.wishes.map(w => w.id === wish.id ? { ...wish, name: p.name, price: p.typicalPrice, priceSource: "catalogue", delivery: null } : w) })} />)}
 		</section>
-
-		<div className="planner-actions">
-			<button type="button" className="ghost" aria-expanded={editing} onClick={() => setEditing(!editing)}>{editing ? "Hide details" : "Edit details"}</button>
-		</div>
-		{editing && <FinanceForm draft={draft} setDraft={setDraft} products={catalogue} view={view} busy={busy} onSubmit={goal => void send({ type: "update-goal", goal })} />}
-
-		<PlanResult view={view} busy={busy} saleAmounts={saleAmounts} setSaleAmounts={setSaleAmounts} command={cmd => void send(cmd)} />
-		<footer className="foot">RealDeal doesn't buy, sell or hold money. Prices are the ones you entered; typical prices are rough figures and can be out of date.</footer>
+		<footer className="foot">RealDeal doesn't buy, sell or hold money. Prices are the ones you entered or found in shops; typical prices are rough figures and can be out of date.</footer>
 	</motion.div></>
+}
+
+/** One card per thing to buy now; with nothing affordable yet, one per wish. */
+function picksOf(view: FinanceView, catalogue: Product[], kept: Kept | null) {
+	const buying = new Set(view.plan.actions.filter(a => a.kind === "buy").map(a => view.offers.find(o => o.id === a.id)?.wishId))
+	const wishes = buying.size ? view.goal.wishes.filter(w => buying.has(w.id)) : view.goal.wishes
+	return wishes.map(wish => {
+		const offer = view.offers.find(o => o.wishId === wish.id && o.productId)
+		const product = catalogue.find(p => p.name === wish.name || `${p.brand} ${p.name}` === wish.name) ?? catalogue.find(p => p.id === offer?.productId)
+		const alternatives = (kept?.alternatives[wish.id] ?? []).map(id => catalogue.find(p => p.id === id)).filter((p): p is Product => !!p && p.id !== product?.id && p.name !== wish.name).slice(0, 4)
+		return { wish, product, alternatives }
+	})
 }
 
 /** A chip that opens a small popover. Closes on Escape or a click outside. */

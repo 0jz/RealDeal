@@ -82,6 +82,14 @@ test("a prompt becomes a stored plan with its intent, and update-goal keeps the 
 	assert.deepEqual(updated.intent, v.intent)
 	assert.deepEqual(getGoal(v.id)?.intent, v.intent)
 })
+test("every agent run records when it was queued, before it started", async () => {
+	const v = await settled((await createGoalFromPrompt({ prompt: "Hoću iPhone 15 za 85k", budget: 100000 })).id)
+	assert.ok(v.runs.length > 0)
+	for (const r of v.runs) {
+		assert.equal(typeof r.queuedMs, "number")
+		assert.ok(r.queuedMs! <= r.startMs)
+	}
+})
 test("a prompt with nothing to buy is rejected with the unknown text", async () => {
 	await assert.rejects(createGoalFromPrompt({ prompt: "asdf qwerty", budget: 50000 }), (e: unknown) => e instanceof PromptError && e.unknown.length > 0)
 })

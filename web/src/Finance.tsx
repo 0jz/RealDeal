@@ -147,15 +147,28 @@ export function FinanceForm({ draft, setDraft, products, view, busy, onSubmit, o
 	</section>
 }
 
+/** Record sales and purchases. Used inline on the old form page and in the planner's "Track what you did" dialog. */
+export function TrackPanel({ view, busy, saleAmounts, setSaleAmounts, command }: {
+	view: FinanceView; busy: boolean; saleAmounts: Record<string, string>; setSaleAmounts: (amounts: Record<string, string>) => void; command: (command: Command) => void
+}) {
+	const [paidAmounts, setPaidAmounts] = useState<Record<string, string>>({})
+	const sold = (id: string) => view.ledger.sold.includes(id)
+	const bought = (id: string) => view.ledger.purchased.includes(id)
+	return <>
+		<p className="note">Record a sale when the money arrives, and a purchase when you pay. The plan updates around it. RealDeal never buys or sells anything itself.</p>
+		{view.goal.assets.filter(a => !sold(a.id)).map(a => { const r = view.resale.find(r => r.assetId === a.id); const gross = saleAmounts[a.id] ?? String(r?.gross ?? ""); return <div className="simulation-row" key={a.id}><label className="field"><span className="label">{a.name}: sold for (RSD)</span><input type="number" min={a.fee + a.delivery} step="1" value={gross} onChange={e => setSaleAmounts({ ...saleAmounts, [a.id]: e.target.value })} /></label><button className="ghost" disabled={busy || !gross} onClick={() => command({ type: "confirm-sale", assetId: a.id, gross: Number(gross) })}>Mark as sold</button><p className="note">Minus {rsd(a.fee + a.delivery)} fee and shipping. {r ? `${r.basis === "your price" ? "Your price" : "Rough estimate"} · about ${r.days} days · after fees ${rsd(r.low)}–${rsd(r.high)}` : "No sale price yet."}</p></div> })}
+		{view.offers.filter(o => !bought(o.wishId) && !o.blocked).map(o => { const estimate = o.priceSource === "catalogue"; const paid = paidAmounts[o.id] ?? ""; return <div className="simulation-row" key={o.id}><strong>{o.name} · {rsd(o.price + (o.delivery ?? 0))}</strong><span className="price-label">{priceLabel(o.priceSource)}</span>{estimate && <label className="field paid-field"><span className="label">Amount you paid (RSD)</span><input type="number" inputMode="numeric" min="1" step="1" value={paid} onChange={e => setPaidAmounts({ ...paidAmounts, [o.id]: e.target.value })} /></label>}<button className="ghost" disabled={busy || (estimate && !(Number(paid) > 0))} onClick={() => command(estimate ? { type: "buy", offerId: o.id, paid: Number(paid) } : { type: "buy", offerId: o.id })}>Mark as bought</button><button className="ghost" disabled={busy} onClick={() => command({ type: view.ledger.reservations[o.id] ? "release" : "reserve", offerId: o.id })}>{view.ledger.reservations[o.id] ? "Release set-aside cash" : "Set cash aside"}</button></div> })}
+		{view.goal.wishes.filter(w => bought(w.id)).map(w => <p className="note" key={w.id}>✓ Bought {w.name}</p>)}
+		{view.goal.assets.filter(a => sold(a.id)).map(a => <p className="note" key={a.id}>✓ Sold {a.name}</p>)}
+	</>
+}
+
 /** The plan itself: headline, metrics, actions, "Track what you did", and the agent details. */
 export function PlanResult({ view, busy, saleAmounts, setSaleAmounts, command }: {
 	view: FinanceView; busy: boolean; saleAmounts: Record<string, string>; setSaleAmounts: (amounts: Record<string, string>) => void; command: (command: Command) => void
 }) {
 	const [copied, setCopied] = useState(false)
-	const [paidAmounts, setPaidAmounts] = useState<Record<string, string>>({})
 	const plan = view.plan
-	const sold = (id: string) => view.ledger.sold.includes(id)
-	const bought = (id: string) => view.ledger.purchased.includes(id)
 	const headline = !plan.actions.length ? "Done. Everything on your list is bought." : !plan.complete ? "Buy what fits now. Wait on the rest." : plan.conditional ? "Sell first, then buy." : "You can afford all of it now."
 
 	async function copyLink() {
@@ -175,11 +188,7 @@ export function PlanResult({ view, busy, saleAmounts, setSaleAmounts, command }:
 		</section>
 		<section className="sell">
 			<h2>Track what you did</h2>
-			<p className="note">Record a sale when the money arrives, and a purchase when you pay. The plan updates around it. RealDeal never buys or sells anything itself.</p>
-			{view.goal.assets.filter(a => !sold(a.id)).map(a => { const r = view.resale.find(r => r.assetId === a.id); const gross = saleAmounts[a.id] ?? String(r?.gross ?? ""); return <div className="simulation-row" key={a.id}><label className="field"><span className="label">{a.name}: sold for (RSD)</span><input type="number" min={a.fee + a.delivery} step="1" value={gross} onChange={e => setSaleAmounts({ ...saleAmounts, [a.id]: e.target.value })} /></label><button className="ghost" disabled={busy || !gross} onClick={() => command({ type: "confirm-sale", assetId: a.id, gross: Number(gross) })}>Mark as sold</button><p className="note">Minus {rsd(a.fee + a.delivery)} fee and shipping. {r ? `${r.basis === "your price" ? "Your price" : "Rough estimate"} · about ${r.days} days · after fees ${rsd(r.low)}–${rsd(r.high)}` : "No sale price yet."}</p></div> })}
-			{view.offers.filter(o => !bought(o.wishId) && !o.blocked).map(o => { const estimate = o.priceSource === "catalogue"; const paid = paidAmounts[o.id] ?? ""; return <div className="simulation-row" key={o.id}><strong>{o.name} · {rsd(o.price + (o.delivery ?? 0))}</strong><span className="price-label">{priceLabel(o.priceSource)}</span>{estimate && <label className="field paid-field"><span className="label">Amount you paid (RSD)</span><input type="number" inputMode="numeric" min="1" step="1" value={paid} onChange={e => setPaidAmounts({ ...paidAmounts, [o.id]: e.target.value })} /></label>}<button className="ghost" disabled={busy || (estimate && !(Number(paid) > 0))} onClick={() => command(estimate ? { type: "buy", offerId: o.id, paid: Number(paid) } : { type: "buy", offerId: o.id })}>Mark as bought</button><button className="ghost" disabled={busy} onClick={() => command({ type: view.ledger.reservations[o.id] ? "release" : "reserve", offerId: o.id })}>{view.ledger.reservations[o.id] ? "Release set-aside cash" : "Set cash aside"}</button></div> })}
-			{view.goal.wishes.filter(w => bought(w.id)).map(w => <p className="note" key={w.id}>✓ Bought {w.name}</p>)}
-			{view.goal.assets.filter(a => sold(a.id)).map(a => <p className="note" key={a.id}>✓ Sold {a.name}</p>)}
+			<TrackPanel view={view} busy={busy} saleAmounts={saleAmounts} setSaleAmounts={setSaleAmounts} command={command} />
 		</section>
 		<section className="finder plan-link"><h2>Come back later</h2><p className="note">Your plan is saved at this page's address. Bookmark it or copy the link. Anyone with the link can see and change this plan, so share it only with people you trust.</p><button type="button" className="ghost" onClick={copyLink}>{copied ? "Copied" : "Copy link"}</button></section>
 		<details className="finder"><summary>How the agents checked this plan</summary><ExecutionTimeline runs={view.runs} /><h3>What changed</h3><ol>{view.history.map(h => <li key={h.revision}>{h.reason}</li>)}</ol></details>

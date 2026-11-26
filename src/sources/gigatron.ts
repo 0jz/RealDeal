@@ -40,7 +40,15 @@ export function slugMatches(tokens: string[], term: string): boolean {
 }
 
 type Offer = { price?: number | string; availability?: string; url?: string }
-type ProductLd = { "@type"?: string; name?: string; sku?: string; productID?: string; offers?: Offer | Offer[] }
+type ImageLd = string | { url?: string }
+type ProductLd = { "@type"?: string; name?: string; sku?: string; productID?: string; offers?: Offer | Offer[]; image?: ImageLd | ImageLd[] }
+
+/** First image URL of a JSON-LD Product, only when it is https. */
+function firstImage(image: ProductLd["image"]): string | null {
+	const first = Array.isArray(image) ? image[0] : image
+	const url = typeof first === "string" ? first : first?.url
+	return typeof url === "string" && url.startsWith("https://") ? url : null
+}
 
 /** Reads the schema.org Product block of a product page. null when absent, unpriced or out of stock. */
 export function parseProduct(html: string, url: string): RawListing | null {
@@ -69,6 +77,7 @@ export function parseProduct(html: string, url: string): RawListing | null {
 			seller: null,
 			shopId: "gigatron",
 			shopName: "Gigatron",
+			image: firstImage(d.image),
 		}
 	}
 	return null
