@@ -85,3 +85,16 @@ The synthetic strategy data was replaced by user input, so the hosted app shows 
 - `data/strategy/` is no longer read by the code.
 
 Validation: `npm test` 88 passed; typecheck, `npm run check`, `npm run check:finance` and `npm run build` passed; browser check of the example plan (3,600 RSD left), recording a sale, reload after a server restart, and the phone layout.
+
+## Prompt-first planner (November 26, 2026)
+
+Implements `docs/PROMPT_PLAN.md` (AirPods dropped from the examples; the budget is read from the prompt, there is no separate budget field).
+
+- `src/finance/prompt.ts`: deterministic parser (clauses, sell triggers, products via `resolveQuery`, categories, RSD amounts in `85000` / `85.000` / `85k` / `85 hiljada` / `85 000 rsd` forms, condition follow-ups, 1,000-character cap).
+- `src/finance/interpret.ts`: optional LLM mapping (`REALDEAL_LLM=1`). Unknown product ids are dropped and every amount comes from the parser, so prompt injection can't change prices. Any provider failure falls back to the parser.
+- `src/finance/choose.ts`: up to 4 candidates per category want, at most 4⁵ combinations, each run through the existing `optimize`; ranked by priority coverage, then product score, then net cost, then id. Products being sold are never suggested.
+- `src/finance/model.ts`: catalogue-priced offers (`priceSource: "catalogue"`) and shopless offers treat unknown delivery as a warning; estimates skip the too-cheap check; buying an estimate requires `paid`, and the ledger records `paid`.
+- `POST /api/goal/from-prompt` (rate-limited like `POST /api/goal`), 422 `{error, unknown}` when nothing matched or no amount was given.
+- Web: one prompt box with three example chips, the existing plan, editable "What I understood" chips (swap, own price, remove), and the old form under **Edit details**. The search tab is no longer rendered; its API and the bot remain.
+
+Validation: `npm test` (118 tests), `npm run typecheck`, `npm run check:finance` (adds one prompt scenario end to end).
