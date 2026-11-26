@@ -14,14 +14,17 @@ Since 1 May 2026, Serbian consumer protection law requires the advertised "previ
 
 ```bash
 npm i
-npm run dev        # PriceFeed + ThirtyDayAgent + KPMarketAgent, prints the event timeline
+npm run dev        # runs the swarm, prints a summary and self-checks (add `-- --log` for every event)
 npm run data       # writes data/out/dataset.json, checks every planted pattern
 npm run typecheck
 ```
 
 ## How agents run concurrently (so far)
 
-Every agent is a Mozaik participant on one shared runtime. `publish()` hands each event to every participant's matching handler **without awaiting it**, so each agent's async handler runs on its own: when `price.changed` arrives, ThirtyDayAgent and KPMarketAgent both start on it at the same moment, and KP lookups from earlier events are still in flight while new prices arrive. There is no central scheduler. Agents publish their findings (`discount.fake`, `kp.price`, …) as new events that other agents can react to. Every emit/start/end is logged with a timestamp and agent name ([src/runtime.ts](src/runtime.ts), [src/agents/kit.ts](src/agents/kit.ts)).
+Every agent is a Mozaik participant on one shared runtime. `publish()` hands each event to every participant's matching handler **without awaiting it**, so each agent's async handler runs on its own: when `price.changed` arrives, ThirtyDayAgent and KPMarketAgent both start on it at the same moment, and KP lookups from earlier events are still in flight while new prices arrive. There is no central scheduler. Agents publish their findings (`discount.fake`, `kp.price`, `crossshop.best`, …) as new events that other agents can react to:
+
+- **VerdictAgent never waits for all results.** Each finding updates one field of the offer's record and the verdict is recomputed at once, so it can go CHECKING → REAL DEAL → BUY ON KP INSTEAD as agents report in.
+- **Cascade:** ThirtyDayAgent emits `discount.fake` → ShopTrustAgent lowers that shop's trust and emits `shop.trust.changed` → VerdictAgent re-scores every product from that shop. Every emit/start/end is logged with a timestamp and agent name ([src/runtime.ts](src/runtime.ts), [src/agents/kit.ts](src/agents/kit.ts)).
 
 ## Status
 
