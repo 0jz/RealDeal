@@ -5,3 +5,4 @@ data/out/
 .env.local
 *.log
 .DS_Store
+data/cache/

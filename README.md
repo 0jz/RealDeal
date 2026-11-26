@@ -50,7 +50,9 @@ Every agent is a Mozaik participant on one shared runtime. `publish()` hands eac
 
 All data in this repository is **synthetic** ([data/fixtures](data/fixtures)). Shop names, sellers and prices are fictional and say nothing about any real retailer. Every source runs from fixtures by default, which imitate a site's literal search, its paging and its latency.
 
-Live fetching goes through [src/sources/http.ts](src/sources/http.ts): robots.txt check, rate limit, cache, backoff, and an honest User-Agent. No source is switched to live yet: KupujemProdajem's terms forbid automated collection, so the KP adapter stays fixture-only unless KP gives permission.
+Live fetching goes through [src/sources/http.ts](src/sources/http.ts): robots.txt check, rate limit, cache, backoff, and an honest User-Agent. KupujemProdajem's terms forbid automated collection, so the KP adapter stays fixture-only unless KP gives permission.
+
+One live source exists, off by default: `LIVE_SOURCES=gigatron` in `.env` adds real Gigatron prices ([src/sources/gigatron.ts](src/sources/gigatron.ts)). It never uses Gigatron's search, which robots.txt disallows. It matches terms against product URLs from Gigatron's sitemap and opens only the matching product pages, one request every 2 s. The first run builds the index (~45 requests, about 90 s) and caches it in `data/cache` for a day. Gigatron's terms allow its content for personal, non-commercial use only, so this is for the local prototype; ask Gigatron before using it anywhere public.
 
 ## Docs
 
