@@ -1,0 +1,12 @@
+{
+  "note": "Approximate fixed rates (RSD per 1 unit) used only to convert the SYNTHETIC world reference prices. Not live and not official; official rates: National Bank of Serbia, https://www.nbs.rs/en/finansijsko_trziste/informacije-za-javnost/kursna-lista/",
+  "asOf": "approximate, 2025-2026 range",
+  "rates": {
+    "RSD": 1,
+    "EUR": 117.2,
+    "USD": 101.5,
+    "HUF": 0.3,
+    "PLN": 27.4,
+    "GBP": 139
+  }
+}

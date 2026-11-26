@@ -4,6 +4,7 @@
     "name": "Orbis Phone 12 128GB",
     "category": "Phones",
     "gtin": "SYN860000001013",
+    "ean13": "2008600000015",
     "featuredRetailer": "r5"
   },
   {
@@ -11,6 +12,7 @@
     "name": "Lumen 55\" 4K TV QL55",
     "category": "TV",
     "gtin": "SYN860000002026",
+    "ean13": "2008600000022",
     "featuredRetailer": "r5"
   },
   {
@@ -18,6 +20,7 @@
     "name": "Vetra Robot Vacuum S7",
     "category": "Home",
     "gtin": "SYN860000003039",
+    "ean13": "2008600000039",
     "featuredRetailer": "r3"
   },
   {
@@ -25,6 +28,7 @@
     "name": "Kora Air Fryer XL 6L",
     "category": "Kitchen",
     "gtin": "SYN860000004052",
+    "ean13": "2008600000046",
     "featuredRetailer": "r5"
   },
   {
@@ -32,6 +36,7 @@
     "name": "Nimbus Laptop 14 16GB 512GB",
     "category": "Laptops",
     "gtin": "SYN860000005065",
+    "ean13": "2008600000053",
     "featuredRetailer": "r1"
   },
   {
@@ -39,6 +44,7 @@
     "name": "Sonar H900 ANC Headphones",
     "category": "Audio",
     "gtin": "SYN860000006078",
+    "ean13": "2008600000060",
     "featuredRetailer": "r3"
   },
   {
@@ -46,6 +52,7 @@
     "name": "Pixa Z50 Mirrorless Camera Kit",
     "category": "Cameras",
     "gtin": "SYN860000007091",
+    "ean13": "2008600000077",
     "featuredRetailer": "r2"
   },
   {
@@ -53,6 +60,7 @@
     "name": "Brio B2 Espresso Machine",
     "category": "Kitchen",
     "gtin": "SYN860000008104",
+    "ean13": "2008600000084",
     "featuredRetailer": "r5"
   },
   {
@@ -60,6 +68,7 @@
     "name": "Atlas Game Console 1TB",
     "category": "Gaming",
     "gtin": "SYN860000009117",
+    "ean13": "2008600000091",
     "featuredRetailer": "r1"
   },
   {
@@ -67,6 +76,7 @@
     "name": "Flux W3 Smartwatch",
     "category": "Wearables",
     "gtin": "SYN860000010130",
+    "ean13": "2008600000107",
     "featuredRetailer": "r4"
   },
   {
@@ -74,6 +84,7 @@
     "name": "Kora Stick Blender 1000W",
     "category": "Kitchen",
     "gtin": "SYN860000011143",
+    "ean13": "2008600000114",
     "featuredRetailer": "r3"
   },
   {
@@ -81,6 +92,7 @@
     "name": "Tera External SSD 2TB",
     "category": "Storage",
     "gtin": "SYN860000012156",
+    "ean13": "2008600000121",
     "featuredRetailer": "r5"
   },
   {
@@ -88,6 +100,7 @@
     "name": "Orbis Tablet 11 128GB",
     "category": "Tablets",
     "gtin": "SYN860000013169",
+    "ean13": "2008600000138",
     "featuredRetailer": "r3"
   },
   {
@@ -95,6 +108,7 @@
     "name": "Vetra V12 Cordless Vacuum",
     "category": "Home",
     "gtin": "SYN860000014182",
+    "ean13": "2008600000145",
     "featuredRetailer": "r4"
   }
 ]

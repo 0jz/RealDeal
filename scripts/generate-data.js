@@ -146,7 +146,32 @@ const write = (name, obj) => { const f = join(OUT, name); mkdirSync(dirname(f), 
 const meta = { synthetic: true, seed: SEED, generatedBy: "scripts/generate-data.js", bfDate: BF_DATE, historyFrom: START, historyTo: addDays(BF_DATE, -1), currency: "RSD", note: "All retailers, products, prices and listings are fictional and generated from a fixed seed." };
 write("meta.json", meta);
 write("retailers.json", retailers.map(({ id, name, note }) => ({ id, name, note })));
-write("products.json", products.map(({ id, name, category, gtin, featured }) => ({ id, name, category, gtin, featuredRetailer: featured })));
+// Scannable barcodes: EAN-13 in the GS1 "restricted circulation" range 200-299 (for in-store/internal use),
+// so they can never collide with a real product's barcode. Deterministic, no random numbers involved.
+const ean13 = (body12) => { const d = body12.split("").map(Number); const sum = d.reduce((a, x, i) => a + x * (i % 2 ? 3 : 1), 0); return body12 + ((10 - (sum % 10)) % 10); };
+products.forEach((p, i) => { p.ean13 = ean13("2008600" + String(i + 1).padStart(5, "0")); });
+write("products.json", products.map(({ id, name, category, gtin, ean13, featured }) => ({ id, name, category, gtin, ean13, featuredRetailer: featured })));
+
+// Synthetic "world reference prices" for the scanner (separate RNG stream so the data above is unchanged).
+// NOT real market prices. Exchange rates are approximate, fixed values used only to convert this synthetic data.
+const fx = {
+  note: "Approximate fixed rates (RSD per 1 unit) used only to convert the SYNTHETIC world reference prices. Not live and not official; official rates: National Bank of Serbia, https://www.nbs.rs/en/finansijsko_trziste/informacije-za-javnost/kursna-lista/",
+  asOf: "approximate, 2025-2026 range",
+  rates: { RSD: 1, EUR: 117.2, USD: 101.5, HUF: 0.30, PLN: 27.4, GBP: 139.0 },
+};
+const markets = [["DE", "Germany", "EUR"], ["AT", "Austria", "EUR"], ["HR", "Croatia", "EUR"], ["HU", "Hungary", "HUF"], ["PL", "Poland", "PLN"], ["UK", "United Kingdom", "GBP"], ["US", "United States", "USD"]];
+const rand2 = mulberry32(SEED + 1);
+const world = [];
+for (const p of products) {
+  const chosen = markets.filter(() => rand2() < 0.75);
+  for (const [code, country, currency] of (chosen.length >= 3 ? chosen : markets.slice(0, 4))) {
+    const rsd = p.base * (0.82 + rand2() * 0.36);
+    const local = currency === "HUF" ? Math.round(rsd / fx.rates.HUF / 100) * 100 : Number((Math.round(rsd / fx.rates[currency] * 2) / 2 - 0.01).toFixed(2));
+    world.push({ id: `w-${p.id}-${code}`, productId: p.id, ean13: p.ean13, market: code, country, currency, price: local, observedAt: "2026-11-20", note: "synthetic" });
+  }
+}
+write("world-prices.json", world);
+write("fx-rates.json", fx);
 write("history.json", history);
 write("feed/page-1.json", offersPage1);
 write("feed/page-2.json", offersPage2);
