@@ -86,6 +86,45 @@ test("unchecked offers are never selected", () => {
 	const unchecked = assessOffers(G).map(o => ({ ...o, blocked: true }))
 	assert.equal(optimize({ ...G, cash: 1000000 }, emptyLedger(), unchecked, []).selectedOffers.length, 0)
 })
+test("catalogue estimate with unknown delivery: a warning, not a block, and it can be planned", () => {
+	const g = withWish({ ...G, cash: 1000000 }, "phone", { delivery: null, priceSource: "catalogue" })
+	const o = assessOffers(g).find(o => o.id === "phone")!
+	assert.equal(o.blocked, false); assert.equal(o.priceSource, "catalogue")
+	assert.ok(o.risks.includes("Delivery not known yet; add it when you pick a shop"))
+	const p = plan(g)
+	assert.ok(p.selectedOffers.includes("phone"))
+	assert.equal(p.actions.find(a => a.id === "phone")!.why, "Typical price (estimate); delivery not known yet.")
+})
+test("catalogue estimate far below typical is not blocked by the too-cheap check", () => {
+	const g = withWish({ ...G, cash: 1000000 }, "phone", { price: 30000, priceSource: "catalogue" })
+	const o = assessOffers(g).find(o => o.id === "phone")!
+	assert.equal(o.blocked, false)
+	assert.ok(!o.risks.some(r => r.startsWith("Price is far below")))
+})
+test("a user-priced offer with unknown delivery is still blocked", () => {
+	const o = assessOffers(withWish({ ...G, cash: 1000000 }, "phone", { delivery: null })).find(o => o.id === "phone")!
+	assert.equal(o.blocked, true); assert.equal(o.priceSource, "you")
+	assert.ok(o.risks.includes("Delivery cost unknown: ask the shop before paying"))
+})
+test("buying an estimate requires the amount paid, and the ledger records that amount", () => {
+	const g = withWish({ ...G, cash: 1000000 }, "phone", { priceSource: "catalogue" })
+	const offers = assessOffers(g)
+	const l = emptyLedger()
+	assert.throws(() => transact(g, l, offers, { type: "buy", offerId: "phone" }), /actually paid/)
+	assert.throws(() => transact(g, l, offers, { type: "buy", offerId: "phone", paid: 0 }), /actually paid/)
+	assert.equal(l.spent, 0)
+	transact(g, l, offers, { type: "buy", offerId: "phone", paid: 82000 })
+	assert.equal(l.spent, 82000); assert.equal(cashBalance(g, l), 1000000 - 82000)
+	assert.equal(l.verifiedSavings, Math.max(0, (offers.find(o => o.id === "phone")!.typicalPrice ?? 0) - 82000))
+})
+test("a user-priced buy uses the amount paid when given", () => {
+	const g = { ...G, cash: 1000000 }
+	const offers = assessOffers(g)
+	const l = emptyLedger()
+	transact(g, l, offers, { type: "buy", offerId: "phone", paid: 80000 })
+	assert.equal(l.spent, 80000)
+	assert.throws(() => validateGoal(withWish(G, "phone", { priceSource: "bogus" as never })), /Price source/)
+})
 test("invalid input can't mutate a ledger or create a goal", () => {
 	for (const gross of [-1, NaN, Infinity, 1.25, 9999999999999999, 999]) {
 		const l = emptyLedger()

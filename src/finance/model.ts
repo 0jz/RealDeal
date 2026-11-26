@@ -33,6 +33,7 @@ export function validateGoal(input: unknown): Goal {
 		requireMoney(w.price, `Price of ${w.name}`)
 		if (w.price === 0) throw new Error(`Enter the price of ${w.name}`)
 		if (w.delivery !== null) requireMoney(w.delivery, `Delivery for ${w.name}`)
+		if (w.priceSource !== undefined && !["you", "catalogue"].includes(w.priceSource)) throw new Error("Price source must be you or catalogue")
 		if (!text(w.shop, 100)) throw new Error("Shop name is too long")
 		if (!text(w.link, 500) || (w.link && !/^https?:\/\/\S+$/i.test(w.link))) throw new Error(`Link for ${w.name} must start with http:// or https://`)
 		if (!int(w.warrantyMonths, 0, 60)) throw new Error("Warranty must be 0–60 months")
@@ -59,7 +60,7 @@ export const typicalPrice = (productId: string | null) => (productId && PRODUCTS
 export function buildOffers(g: Goal): Offer[] {
 	return g.wishes.map(w => {
 		const productId = matchProduct(w.name)
-		return { id: w.id, wishId: w.id, productId, name: w.name, price: w.price, delivery: w.delivery, shop: w.shop, link: w.link, warrantyMonths: w.warrantyMonths, condition: w.condition, typicalPrice: typicalPrice(productId), risks: ["Not checked yet"], blocked: true }
+		return { id: w.id, wishId: w.id, productId, name: w.name, price: w.price, delivery: w.delivery, shop: w.shop, link: w.link, warrantyMonths: w.warrantyMonths, condition: w.condition, typicalPrice: typicalPrice(productId), priceSource: w.priceSource ?? "you", risks: ["Not checked yet"], blocked: true }
 	})
 }
 
@@ -69,9 +70,13 @@ export function checkRisks(g: Goal, offers: Offer[]): RiskCheck {
 	return Object.fromEntries(offers.map(o => {
 		const risks: string[] = []
 		let blocked = false
-		if (o.delivery === null) { risks.push("Delivery cost unknown: ask the shop before paying"); blocked = true }
+		const estimate = o.priceSource === "catalogue"
+		if (o.delivery === null) {
+			if (deliveryPending(o)) risks.push("Delivery not known yet; add it when you pick a shop")
+			else { risks.push("Delivery cost unknown: ask the shop before paying"); blocked = true }
+		}
 		if (o.warrantyMonths < g.minWarrantyMonths) { risks.push(`Warranty ${o.warrantyMonths} months is below your minimum of ${g.minWarrantyMonths}`); blocked = true }
-		if (o.typicalPrice && o.price < o.typicalPrice * (o.condition === "new" ? 0.5 : 0.25)) { risks.push(`Price is far below the typical ${o.typicalPrice.toLocaleString("sr-RS")} RSD: check it is the same product and not a scam`); blocked = true }
+		if (!estimate && o.typicalPrice && o.price < o.typicalPrice * (o.condition === "new" ? 0.5 : 0.25)) { risks.push(`Price is far below the typical ${o.typicalPrice.toLocaleString("sr-RS")} RSD: check it is the same product and not a scam`); blocked = true }
 		if (!o.shop) risks.push("No shop named")
 		if (o.link && !/^https:/i.test(o.link)) risks.push("Link is not HTTPS")
 		return [o.id, { risks, blocked }]
@@ -92,13 +97,23 @@ export function estimateResale(g: Goal): Resale[] {
 	})
 }
 
-const saving = (o: Offer) => o.typicalPrice && o.condition === "new" ? Math.max(0, o.typicalPrice - total(o)) : 0
+const saving = (o: Offer, cost = total(o)) => o.typicalPrice && o.condition === "new" ? Math.max(0, o.typicalPrice - cost) : 0
 
 export const emptyLedger = (): Ledger => ({ confirmedResale: 0, spent: 0, verifiedSavings: 0, sold: [], purchased: [], reservations: {}, receipts: {} })
 export const total = (o: Offer) => o.price + (o.delivery ?? 0)
 export const cashBalance = (g: Goal, l: Ledger) => g.cash + l.confirmedResale - l.spent
 export const reserved = (l: Ledger) => Object.values(l.reservations).reduce((a, b) => a + b, 0)
-export const eligible = (g: Goal, o: Offer) => money(o.price) && o.price > 0 && money(o.delivery) && !o.blocked && o.warrantyMonths >= g.minWarrantyMonths
+/** No shop picked yet (an estimate, or a price from the prompt): unknown delivery is expected, not a red flag. */
+const deliveryPending = (o: Offer) => o.delivery === null && (o.priceSource === "catalogue" || !o.shop)
+export const eligible = (g: Goal, o: Offer) => money(o.price) && o.price > 0 && money(deliveryPending(o) ? 0 : o.delivery) && !o.blocked && o.warrantyMonths >= g.minWarrantyMonths
+const ESTIMATE = "Enter what you actually paid: this price is only an estimate"
+/** What the user actually paid: the entered amount, else the estimate for user-priced offers. */
+const paidAmount = (o: Offer, paid: number | undefined) => {
+	if (paid === undefined) { if (o.priceSource === "catalogue") throw new Error(ESTIMATE); return total(o) }
+	requireMoney(paid, "Amount paid")
+	if (paid === 0 && o.priceSource === "catalogue") throw new Error(ESTIMATE)
+	return paid
+}
 
 /** Priority-first bounded optimization. Minimize cost, then sell only the items needed.
  * Estimated proceeds fund a conditional plan, NEVER the cash guard. */
@@ -127,7 +142,8 @@ export function optimize(g: Goal, l: Ledger, offers: Offer[], resale: Resale[]):
 	const actions: Plan["actions"] = best.sells.map(r => ({ kind: "sell", id: r.assetId, name: g.assets.find(a => a.id === r.assetId)!.name, amount: r.net, when: `About ${r.days} days; wait for the money before buying`, why: r.basis === "your price" ? "Your expected price, minus fees and delivery." : "No price entered: rough estimate from the typical new price. Enter your own for a better plan." }))
 	for (const o of best.buys) {
 		const vs = o.typicalPrice && o.condition === "new" ? ` Typical new price is about ${o.typicalPrice.toLocaleString("sr-RS")} RSD.` : ""
-		actions.push({ kind: "buy", id: o.id, name: o.name, amount: total(o), when: conditional ? "After the sale money arrives" : "You can afford it now", why: `${o.shop || "Shop not named"}, delivery included, ${o.warrantyMonths}-month warranty (${o.condition}).${vs}` })
+		const why = o.priceSource === "catalogue" ? "Typical price (estimate); delivery not known yet." : `${o.shop || "Shop not named"}, delivery included, ${o.warrantyMonths}-month warranty (${o.condition}).${vs}`
+		actions.push({ kind: "buy", id: o.id, name: o.name, amount: total(o), when: conditional ? "After the sale money arrives" : "You can afford it now", why })
 	}
 	for (const w of wishes) if (!best.buys.some(o => o.wishId === w.id)) {
 		const o = offers.find(o => o.wishId === w.id)
@@ -161,11 +177,12 @@ export function transact(g: Goal, l: Ledger, offers: Offer[], command: Command):
 	const o = offers.find(o => o.id === command.offerId)
 	const wish = g.wishes.find(w => w.id === o?.wishId)
 	if (!o || !wish || l.purchased.includes(wish.id) || !eligible(g, o)) throw new Error("Offer is missing, blocked or already bought")
+	const cost = command.type === "buy" ? paidAmount(o, command.paid) : total(o)
 	const available = cashBalance(g, l) - g.reserve - reserved(l) + (l.reservations[o.id] ?? 0)
-	if (total(o) > available) throw new Error(`Not enough cash yet: need ${total(o).toLocaleString("sr-RS")} RSD, have ${available.toLocaleString("sr-RS")} RSD. Money from sales counts once it arrives.`)
-	if (command.type === "reserve") { l.reservations[o.id] = total(o); return `Set aside ${total(o).toLocaleString("sr-RS")} RSD for ${o.name}` }
+	if (cost > available) throw new Error(`Not enough cash yet: need ${cost.toLocaleString("sr-RS")} RSD, have ${available.toLocaleString("sr-RS")} RSD. Money from sales counts once it arrives.`)
+	if (command.type === "reserve") { l.reservations[o.id] = cost; return `Set aside ${cost.toLocaleString("sr-RS")} RSD for ${o.name}` }
 	if (command.type !== "buy") throw new Error("Unknown action")
-	l.spent += total(o); l.purchased.push(wish.id); delete l.reservations[o.id]
-	l.verifiedSavings += saving(o)
-	return `Bought ${o.name}: −${total(o).toLocaleString("sr-RS")} RSD`
+	l.spent += cost; l.purchased.push(wish.id); delete l.reservations[o.id]
+	l.verifiedSavings += saving(o, cost)
+	return `Bought ${o.name}: −${cost.toLocaleString("sr-RS")} RSD`
 }
