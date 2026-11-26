@@ -164,7 +164,7 @@ export function PlanResult({ view, busy, saleAmounts, setSaleAmounts, command }:
 
 	return <>
 		<section className="strategy picks" aria-live="polite">
-			<div className="group-head"><h2 id="plan-headline" className="scroll-mt-6">{headline}</h2><span className="tag">{view.pending ? "Checking…" : `Updated ${new Date(view.updatedAt).toLocaleTimeString()}`}</span></div>
+			<div className="group-head"><h2 id="plan-headline" className="scroll-mt-20">{headline}</h2><span className="tag">{view.pending ? "Checking…" : `Updated ${new Date(view.updatedAt).toLocaleTimeString()}`}</span></div>
 			{view.goal.title && <p>{view.goal.title}</p>}
 			<div className="finance-metrics"><div><span>Cash you can spend now</span><strong>{rsd(plan.availableCash)}</strong></div><div><span>Expected from sales (not cash yet)</span><strong>{rsd(plan.estimatedResale)}</strong></div><div><span>Planned purchases</span><strong>{rsd(plan.expectedCosts)}</strong></div><div><span>Left after the plan</span><strong>{rsd(plan.projectedRemaining)}</strong></div></div>
 			<p className="strategy-reason">{view.reason}</p>

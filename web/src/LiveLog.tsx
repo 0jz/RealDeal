@@ -81,7 +81,7 @@ export function LiveLog({ view, collapsed = false }: { view: FinanceView; collap
 
 	return <motion.section
 		aria-label="Agent log"
-		className="w-full overflow-hidden rounded-md bg-[var(--log-bg)] text-left text-[var(--log-ink)]"
+		className="w-full overflow-hidden rounded-md border border-[var(--log-rule)] bg-[var(--log-bg)] text-left text-[var(--log-ink)]"
 		initial={reduce ? false : { opacity: 0, y: -8 }}
 		animate={{ opacity: 1, y: 0 }}
 		transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}

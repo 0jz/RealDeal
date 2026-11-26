@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, 
 import type { Asset, Command, FinanceView, Goal, Intent, Wish } from "../../src/finance/types"
 import { motion, useReducedMotion } from "motion/react"
 import { LiveLog, settled } from "./LiveLog"
+import { Landing, SiteNav } from "./Landing"
 import { blankDraft, CommandError, followPlan, FinanceForm, planIdFromUrl, PlanResult, priceLabel, rsd, sendCommand, setPlanInUrl, toDraft, type Draft, type Product } from "./Finance"
 
 const MAX_CHARS = 1000
@@ -125,10 +126,9 @@ export function Planner() {
 
 	const checking = phase === "checking"
 
-	if (!view || checking) return <main className="page ask-page">
-		<section className="ask" aria-labelledby="ask-title">
-			<p className="brand">RealDeal</p>
-			<h1 id="ask-title">What do you want to buy or sell?</h1>
+	if (!view || checking) return <Landing>
+		<div className="ask" aria-labelledby="ask-title">
+			<h2 id="ask-title">What do you want to buy or sell?</h2>
 			<div className="ask-box">
 				<label className="field"><span className="sr-only">Describe what you want to buy or sell</span>
 					<textarea value={text} maxLength={MAX_CHARS} rows={1} placeholder="e.g. New phone for 75000 RSD. I can sell my old iPhone 13." aria-describedby="ask-count" onChange={e => setText(e.target.value)} onKeyDown={onPromptKey} readOnly={checking} />
@@ -145,15 +145,15 @@ export function Planner() {
 				<p className="label">Or try one of these</p>
 				<ul>{EXAMPLES.map(ex => <li key={ex}><button type="button" onClick={() => setText(ex)}>{ex}</button></li>)}</ul>
 			</div>}
-		</section>
-	</main>
+		</div>
+	</Landing>
 
 	const alternativesFor = (wish: Wish) => (kept?.alternatives[wish.id] ?? [])
 		.map(id => catalogue.find(p => p.id === id))
 		.filter((p): p is Product => !!p && p.name !== wish.name)
 
-	return <motion.div className="page finance-page planner-page" initial={phase === "revealed" && !reduce ? { opacity: 0, y: 12 } : false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}>
-		<header className="planner-bar"><p className="brand">RealDeal</p><button type="button" className="ghost" onClick={newPlan}>New plan</button></header>
+	return <><SiteNav action={<button type="button" className="ghost" onClick={newPlan}>New plan</button>} />
+	<motion.div className="page finance-page planner-page" initial={phase === "revealed" && !reduce ? { opacity: 0, y: 12 } : false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}>
 		{error && <p className="alert" role="alert">{error}</p>}
 		{phase === "revealed" && <LiveLog view={view} collapsed />}
 
@@ -176,7 +176,7 @@ export function Planner() {
 
 		<PlanResult view={view} busy={busy} saleAmounts={saleAmounts} setSaleAmounts={setSaleAmounts} command={cmd => void send(cmd)} />
 		<footer className="foot">RealDeal doesn't buy, sell or hold money. Prices are the ones you entered; typical prices are rough figures and can be out of date.</footer>
-	</motion.div>
+	</motion.div></>
 }
 
 /** A chip that opens a small popover. Closes on Escape or a click outside. */

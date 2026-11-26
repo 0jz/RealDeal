@@ -1,0 +1,68 @@
+/* Front page and top bar. Adapted from Nikita's public/site.css on the `site` branch. */
+
+.site-nav {
+	position: sticky;
+	top: 0;
+	z-index: 5;
+	display: flex;
+	align-items: center;
+	gap: 20px;
+	flex-wrap: wrap;
+	padding: 12px var(--gutter);
+	background: color-mix(in srgb, var(--night) 93%, transparent);
+	backdrop-filter: blur(6px);
+	color: #fff;
+}
+.site-brand { display: flex; gap: 10px; align-items: center; color: #fff; text-decoration: none; font-weight: 800; font-size: 17px; }
+.site-logo { width: 32px; height: 32px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 900; }
+.site-nav nav { display: flex; gap: 18px; flex-wrap: wrap; }
+.site-nav nav a { color: #cbd5e1; text-decoration: none; font-weight: 500; }
+.site-nav nav a:hover { color: #fff; }
+.site-nav-action { margin-left: auto; }
+.site-nav .ghost { color: #fff; border-color: #475569; }
+
+.site-notice { background: #fff7e0; color: #422006; border-bottom: 1px solid #f3d19c; padding: 8px var(--gutter); font-size: 13px; text-align: center; }
+
+.site-hero { background: radial-gradient(1200px 500px at 80% -10%, #3b2f0a 0%, transparent 60%), var(--night); color: var(--night-ink); padding: 64px var(--gutter) 48px; }
+.site-hero-inner { max-width: 1160px; margin: 0 auto; }
+.site-eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: 12px; color: var(--accent); font-weight: 700; margin: 0 0 8px; }
+.site-hero h1 { font-size: clamp(36px, 6vw, 64px); line-height: 1.05; margin: 0 0 16px; letter-spacing: -.02em; }
+.site-hero h1 em { font-style: normal; color: var(--accent); border-bottom: 3px dotted var(--accent); }
+.site-lead { max-width: 720px; font-size: 18px; color: #cbd5e1; }
+.site-lead b { color: #fff; }
+.site-cta { display: flex; gap: 12px; margin: 24px 0 32px; flex-wrap: wrap; }
+.site-btn { display: inline-block; padding: 11px 20px; border-radius: 10px; border: 1px solid #475569; color: #fff; font-weight: 600; text-decoration: none; transition: transform 120ms ease-out; }
+.site-btn:active { transform: scale(0.97); }
+.site-btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.site-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.site-stat { background: var(--night-sheet); border: 1px solid var(--night-rule); border-radius: 14px; padding: 16px; }
+.site-stat-v { font-size: 28px; font-weight: 800; white-space: nowrap; } .site-stat-v span { font-size: 16px; color: var(--night-muted); font-weight: 500; }
+.site-stat-v.green { color: #86efac; }
+.site-stat-l { color: var(--night-muted); font-size: 13px; margin-top: 4px; }
+.site-hero-foot { color: var(--night-muted); font-size: 13px; margin-top: 14px; }
+.site-hero a:not(.site-btn) { color: var(--accent-soft); }
+
+.site-wrap { max-width: 1160px; margin: 0 auto; padding: 0 var(--gutter); }
+.site-section { padding: 48px 0 8px; scroll-margin-top: 64px; }
+.site-section h2 { font-size: 28px; margin: 0 0 12px; letter-spacing: -.01em; }
+.site-section > .muted { max-width: 760px; }
+.site-agents { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; margin: 18px 0; }
+.site-agent { background: var(--sheet); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 16px; }
+.site-agent p { margin: 6px 0 0; }
+.site-agent-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.site-dot { width: 12px; height: 12px; border-radius: 50%; }
+.site-tag { margin-left: auto; font-size: 12px; background: var(--paper); padding: 2px 8px; border-radius: 999px; color: var(--muted); }
+
+/* The prompt box keeps its own .ask layout inside the section. */
+.site-plan .ask { padding-top: 0; }
+.site-footer { padding: 48px var(--gutter) 48px; color: var(--muted); font-size: 13px; display: grid; gap: 6px; }
+
+@media (max-width: 900px) {
+	.site-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.site-nav nav { display: none; }
+	.site-hero { padding-top: 36px; }
+}
+@media (max-width: 420px) {
+	.site-stat-v { font-size: 19px; }
+	.site-stat { padding: 14px 12px; }
+}
