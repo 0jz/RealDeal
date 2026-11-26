@@ -1,36 +1,39 @@
-type Offer = { history: (number | null)[]; shownPrevPrice: number }
+type Offer = {
+	history: (number | null)[]
+	shownPrevPrice: number
+	/** Explicit assortment age; gaps in observations do NOT establish a new product. */
+	assortmentDays?: number
+	perishable?: boolean
+	/** Use the pre-campaign reference window for an uninterrupted progressive reduction. */
+	campaignReferenceHistory?: (number | null)[]
+}
 
 export type ThirtyDayResult = {
-	/** Lowest real price in the reference window. */
 	realLow: number
-	/** 30, or 15 for items in stock less than 30 days. */
-	windowDays: 30 | 15
-	/** Shown previous price respects the rule. */
+	windowDays: number
+	/** Compatibility field: reference consistency only, NOT a legal finding. */
 	legal: boolean
-	/** Discount off the real low, in percent (negative = price went up). */
+	status: "consistent" | "misleading-reference" | "insufficient-history" | "exception"
 	realDiscountPct: number
 	claimedDiscountPct: number
 }
 
 /**
- * Serbia's 30-day rule (consumer protection law, in force since 1 May 2026):
- * the advertised previous price must be the lowest price in the 30 days before
- * the sale, or in the last 15 days for products in stock less than 30 days.
+ * Reference-price screening, not a legal verdict. Trade Law amendment (35/2026),
+ * article 14 amending article 37: ordinarily 30 days; assortment <30 days requires
+ * at least 15 days; perishables/short shelf life excluded; progressive reductions
+ * retain the pre-campaign reference. See docs/LEGAL_REFERENCE.md.
  */
-export function checkThirtyDay(offer: Pick<Offer, "history" | "shownPrevPrice">, salePrice: number): ThirtyDayResult {
-	const last30 = offer.history.slice(-30)
-	const inStockDays = last30.filter((p) => p !== null).length
-	const windowDays = inStockDays < 30 ? 15 : 30
-	const window = offer.history.slice(-windowDays).filter((p): p is number => p !== null)
-	const realLow = Math.min(...window)
-	const pct = (from: number) => Math.round(((from - salePrice) / from) * 1000) / 10
-
-	return {
-		realLow,
-		windowDays,
-		// The rule only binds when a discount is advertised at all.
-		legal: offer.shownPrevPrice <= salePrice || offer.shownPrevPrice <= realLow,
-		realDiscountPct: pct(realLow),
-		claimedDiscountPct: pct(offer.shownPrevPrice),
-	}
+export function checkThirtyDay(offer: Offer, salePrice: number): ThirtyDayResult {
+	const age = offer.assortmentDays
+	const windowDays = age != null && age < 30 ? Math.max(15, age) : 30
+	const history = offer.campaignReferenceHistory ?? offer.history
+	const window = history.slice(-windowDays)
+	const valid = window.filter((p): p is number => p !== null && Number.isFinite(p) && p > 0)
+	const realLow = valid.length ? Math.min(...valid) : 0
+	const pct = (from: number) => from > 0 ? Math.round(((from - salePrice) / from) * 1000) / 10 : 0
+	const complete = valid.length === windowDays && (age == null || age >= 15) && Number.isFinite(salePrice) && salePrice > 0 && Number.isFinite(offer.shownPrevPrice) && offer.shownPrevPrice > 0
+	const consistent = complete && (offer.shownPrevPrice <= salePrice || offer.shownPrevPrice <= realLow)
+	const status = offer.perishable ? "exception" : !complete ? "insufficient-history" : consistent ? "consistent" : "misleading-reference"
+	return { realLow, windowDays, legal: status === "consistent", status, realDiscountPct: pct(realLow), claimedDiscountPct: pct(offer.shownPrevPrice) }
 }

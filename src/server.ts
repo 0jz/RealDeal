@@ -5,6 +5,8 @@ import { extname, join, normalize } from "node:path"
 import { resolveRuntime, type LogEntry } from "./runtime"
 import { cancel, search, startEngine, subscribe } from "./search/engine"
 import type { Category, SearchMode, SearchRequest } from "./search/types"
+import { commandGoal, createGoal, DEMO_GOAL, getGoal, subscribeGoal } from "./finance/engine"
+import type { CommandRequest } from "./finance/types"
 
 // One process: the Mozaik search swarm, a small JSON API, an SSE stream per
 // search, and the UI (Vite middleware in dev, the built files with --prod).
@@ -37,6 +39,7 @@ const MODES: SearchMode[] = ["search", "budget", "sell"]
 const CATEGORIES: Category[] = ["phone", "laptop", "tablet", "console", "tv", "headphones", "gpu", "watch"]
 
 function toRequest(body: unknown): SearchRequest | null {
+	if (!body || typeof body !== "object") return null
 	const b = body as Partial<SearchRequest>
 	const query = typeof b.query === "string" ? b.query.trim().slice(0, 300) : ""
 	const mode = MODES.includes(b.mode as SearchMode) ? (b.mode as SearchMode) : "search"
@@ -69,6 +72,30 @@ function openStream(id: string, req: IncomingMessage, res: ServerResponse) {
 }
 
 async function api(req: IncomingMessage, res: ServerResponse, path: string): Promise<void> {
+	if (req.method === "GET" && path === "/api/health") return json(res, 200, { ok: true, transactions: "simulated" })
+	if (req.method === "GET" && path === "/api/goal/demo") return json(res, 200, DEMO_GOAL)
+	if (req.method === "POST" && path === "/api/goal") {
+		try { return json(res, 201, createGoal(await readBody(req))) }
+		catch (error) { return json(res, 400, { error: String(error) }) }
+	}
+	const goalRoute = /^\/api\/goal\/([\w-]+)(?:\/(stream|command))?$/.exec(path)
+	if (goalRoute) {
+		const id = goalRoute[1]
+		const view = getGoal(id)
+		if (!view) return json(res, 404, { error: "Unknown goal" })
+		if (req.method === "GET" && !goalRoute[2]) return json(res, 200, view)
+		if (req.method === "GET" && goalRoute[2] === "stream") {
+			res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" })
+			const off = subscribeGoal(id, v => send(res, "view", v))
+			const heartbeat = setInterval(() => res.write(": heartbeat\n\n"), 15_000)
+			req.on("close", () => { off(); clearInterval(heartbeat) })
+			return
+		}
+		if (req.method === "POST" && goalRoute[2] === "command") {
+			try { return json(res, 200, commandGoal(id, await readBody(req) as CommandRequest)) }
+			catch (error) { return json(res, 409, { error: String(error), view: getGoal(id) }) }
+		}
+	}
 	if (req.method === "POST" && path === "/api/search") {
 		const request = toRequest(await readBody(req).catch(() => null))
 		if (!request) return json(res, 400, { error: "query required (budget mode: budget and query or category)" })

@@ -77,8 +77,8 @@ export function rowWhy(r: ResultRow): string {
 	else if (r.market && r.flag === "good") parts.push("ispod tržišne cene")
 	else if (r.flag === "high") parts.push("skuplje od tržišne cene")
 	else if (r.flag === "suspicious") parts.push("sumnjivo jeftino")
-	if (r.thirtyDay && !r.thirtyDay.legal) parts.push(`lažni popust: stvarna najniža cena za 30 dana ${rsd(r.thirtyDay.realLow)}`)
-	if (r.shopTrust != null && r.shopTrust < TRUST_THRESHOLD) parts.push(`prodavnica uhvaćena u lažnim popustima (poverenje ${r.shopTrust})`)
+	if (r.thirtyDay && !r.thirtyDay.legal) parts.push(`neusklađena referentna cena: zabeleženi minimum za 30 dana ${rsd(r.thirtyDay.realLow)}`)
+	if (r.shopTrust != null && r.shopTrust < TRUST_THRESHOLD) parts.push(`neusklađene referentne cene prodavnice (poverenje ${r.shopTrust})`)
 	if (r.method === "fuzzy") parts.push("naziv ispravljen")
 	return parts.join(", ")
 }

@@ -199,6 +199,7 @@ export const shopCheckAgent = defineAgent(SHOP, "Checks a shop's advertised disc
 			if (!s) return "unknown search"
 			const shopId = listing.shopId!
 			const r = checkThirtyDay({ history: listing.history!, shownPrevPrice: listing.shownPrevPrice! }, listing.price)
+			if (r.status === "insufficient-history" || r.status === "exception") return `${shopId}: reference check inconclusive`
 			const checked: DiscountChecked = { searchId, key, shopId, legal: r.legal, realLow: r.realLow, claimedPct: r.claimedDiscountPct, realPct: r.realDiscountPct }
 			s.discounts.set(key, checked)
 			emit(EV.discountChecked, selfId, checked)

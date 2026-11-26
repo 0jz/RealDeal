@@ -1,0 +1,8 @@
+{
+  "notice": "Synthetic seller assessments, not verified real shops.",
+  "sellers": {
+    "Demo Flash Shop": 55,
+    "Demo Verified Shop": 95,
+    "Demo Audio Shop": 90
+  }
+}

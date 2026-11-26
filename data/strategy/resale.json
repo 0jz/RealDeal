@@ -1,0 +1,22 @@
+[
+  {
+    "productId": "iphone-13",
+    "condition": "good",
+    "askingPrices": [
+      30000,
+      31000,
+      32000
+    ],
+    "days": 5
+  },
+  {
+    "productId": "laptop-demo",
+    "condition": "good",
+    "askingPrices": [
+      24000,
+      25000,
+      27000
+    ],
+    "days": 10
+  }
+]

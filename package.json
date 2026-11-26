@@ -1,18 +1,19 @@
 {
 	"name": "realdeal",
 	"version": "0.1.0",
-	"description": "Serbian electronics search engine: KP, shops and price comparison sites searched at once by a concurrent Mozaik agent swarm, with a website and a Telegram bot. Team JDI.",
+	"description": "Buy and sell strategy for a shared cash goal, with concurrent Mozaik loops and deterministic simulated transactions.",
 	"type": "module",
 	"private": true,
 	"scripts": {
-		"dev": "tsx src/server.ts",
+		"dev": "node --import tsx src/server.ts",
 		"build": "vite build --config web/vite.config.ts",
-		"start": "tsx src/server.ts --prod",
-		"bot": "tsx src/bot/main.ts",
-		"check": "tsx src/check.ts",
-		"fixtures": "tsx src/sources/fixtures/generate.ts",
+		"start": "node --import tsx src/server.ts --prod",
+		"bot": "node --import tsx src/bot/main.ts",
+		"check": "node --import tsx src/check.ts",
+		"fixtures": "node --import tsx src/sources/fixtures/generate.ts",
 		"test": "node --import tsx --test \"src/**/*.test.ts\"",
-		"typecheck": "tsc --noEmit && tsc --noEmit -p web"
+		"typecheck": "tsc --noEmit && tsc --noEmit -p web",
+		"check:finance": "node --import tsx src/finance/check.ts"
 	},
 	"dependencies": {
 		"@mozaik-ai/core": "6.0.0",

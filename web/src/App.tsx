@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react"
 import { useSearch } from "./stream"
 import { Timeline } from "./Timeline"
+import { Finance } from "./Finance"
 import type {
 	Category,
 	Condition,
@@ -64,6 +65,11 @@ function requestFor(mode: SearchMode, query: string, budget: number, category: C
 }
 
 export function App() {
+	const [screen, setScreen] = useState<"strategy" | "search">("strategy")
+	return <><nav className="app-nav" aria-label="Main navigation"><button className="ghost" aria-pressed={screen === "strategy"} onClick={() => setScreen("strategy")}>Buy + sell strategy</button><button className="ghost" aria-pressed={screen === "search"} onClick={() => setScreen("search")}>Search / budget / sell tools</button></nav>{screen === "strategy" ? <Finance /> : <SearchApp />}</>
+}
+
+function SearchApp() {
 	const { view, store, running, error, run } = useSearch()
 	const [mode, setMode] = useState<SearchMode>("search")
 	const [query, setQuery] = useState("")
@@ -96,7 +102,7 @@ export function App() {
 	const showTimeline = view !== null || running
 
 	return (
-		<div className="page">
+		<div className="page" lang="sr">
 			<header className="masthead">
 				<h1>RealDeal</h1>
 				<p className="tagline">Pretraga elektronike koja razume kako ljudi pišu oglase.</p>

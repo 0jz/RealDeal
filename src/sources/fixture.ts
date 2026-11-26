@@ -1,4 +1,4 @@
-// A source that reads recorded listings from a JSON file and imitates a dumb
+// A source that reads recorded listings from a JSON file and implements a literal
 // literal site search: no typo correction, no transliteration, no synonyms.
 // That is the point: the engine has to expand queries itself.
 
@@ -12,21 +12,16 @@ export type FixtureOptions = {
 	/** Absolute path to a JSON array of RawListing. */
 	file: string
 	pageSize?: number
-	/** Simulated network latency, [min, max] ms. */
+	/** Deprecated, ignored. Fixture work uses actual asynchronous file reads. */
 	latencyMs?: [number, number]
 }
 
 /** Lowercase and strip Latin diacritics (č -> c). Cyrillic is left alone on purpose. */
 export const normalize = (s: string) => s.toLowerCase().replace(/đ/g, "d").normalize("NFD").replace(/[̀-ͯ]/g, "")
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
-
 export function createFixtureAdapter(opts: FixtureOptions): SourceAdapter {
 	const pageSize = opts.pageSize ?? 12
-	const [minMs, maxMs] = opts.latencyMs ?? [150, 700]
-	let loaded: Promise<RawListing[]> | null = null
-	const load = () => (loaded ??= readFile(opts.file, "utf8").then((text) => JSON.parse(text) as RawListing[]))
-	const latency = () => sleep(minMs + Math.random() * (maxMs - minMs))
+	const load = () => readFile(opts.file, "utf8").then((text) => JSON.parse(text) as RawListing[])
 
 	return {
 		id: opts.id,
@@ -36,7 +31,6 @@ export function createFixtureAdapter(opts: FixtureOptions): SourceAdapter {
 
 		async search(term: string, page: number): Promise<SearchPage> {
 			const listings = await load()
-			await latency()
 			const words = normalize(term).split(/\s+/).filter(Boolean)
 			const hits = words.length === 0 ? [] : listings.filter((l) => {
 				const haystack = normalize(`${l.title} ${l.description ?? ""}`)
@@ -48,7 +42,6 @@ export function createFixtureAdapter(opts: FixtureOptions): SourceAdapter {
 
 		async detail(listing: RawListing): Promise<Partial<RawListing>> {
 			const listings = await load()
-			await sleep(50 + Math.random() * 150)
 			const found = listings.find((l) => l.id === listing.id)
 			return { description: found?.description ?? null }
 		},

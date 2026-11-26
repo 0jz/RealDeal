@@ -71,7 +71,8 @@ for (const v of views) {
 	if (v.sell) console.log(`  SELL ${v.sell.name}: ${v.sell.quick}–${v.sell.patient} from ${v.sell.comps.length} comps; draft "${v.sell.draft?.title}"`)
 }
 
-const earlyStart = ids.every((id) => (firstResultAt.get(id) ?? Infinity) - state.startedAt < sourceDoneAt(id))
+// Measure actual publication, not the UI throttle. Disk reads may finish in <150ms.
+const earlyStart = ids.every((id) => log.findIndex(e => e.searchId === id && e.event === EV.resultsUpdated && e.kind === "emit") < log.findLastIndex(e => e.searchId === id && e.event === EV.sourceDone && e.kind === "emit"))
 console.log(`\nevents emitted: ${log.filter((e) => e.kind === "emit").length}, peak ${peak} handlers in flight, errors ${errors.length}`)
 console.log(`agents that ran at the same moment: ${[...overlapped].filter((p) => /Source/.test(p)).slice(0, 6).join(", ")}…`)
 
