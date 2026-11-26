@@ -1,0 +1,7 @@
+# VPS deployment: `npm ci && PORT=3000 npm start` under systemd/pm2, then Caddy in front (automatic HTTPS).
+checker.example.com {
+	reverse_proxy localhost:3000 {
+		# keep Server-Sent Events streaming (no response buffering)
+		flush_interval -1
+	}
+}
