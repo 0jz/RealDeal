@@ -16,6 +16,11 @@ type Miss = { message: string; unknown: string[] }
 /** The interpretation and swap candidates. The server may not resend them after an update, so they stay here. */
 type Kept = { intent: Intent; alternatives: Record<string, string[]> }
 
+/** The title the planner gives a goal, built like choose.ts does: "iPhone 15, sell iPhone 13". */
+const autoTitle = (goal: Goal) => [...goal.wishes.map(w => w.name), ...goal.assets.map(a => `sell ${a.name}`)].join(", ").slice(0, 300)
+/** Keeps a generated title in step with the items. A title the user typed is left alone. */
+const retitle = (before: Goal, after: Goal): Goal => before.title === autoTitle(before) ? { ...after, title: autoTitle(after) || after.title } : after
+
 export function Planner() {
 	const [text, setText] = useState("")
 	const [catalogue, setCatalogue] = useState<Product[]>([])
@@ -108,7 +113,7 @@ export function Planner() {
 			<h1 id="ask-title">What do you want to buy or sell?</h1>
 			<div className="ask-box">
 				<label className="field"><span className="sr-only">Describe what you want to buy or sell</span>
-					<textarea value={text} maxLength={MAX_CHARS} rows={4} placeholder="e.g. New phone for 75000 RSD. I can sell my old iPhone 13." aria-describedby="ask-count" onChange={e => setText(e.target.value)} onKeyDown={onPromptKey} />
+					<textarea value={text} maxLength={MAX_CHARS} rows={1} placeholder="e.g. New phone for 75000 RSD. I can sell my old iPhone 13." aria-describedby="ask-count" onChange={e => setText(e.target.value)} onKeyDown={onPromptKey} />
 				</label>
 				<div className="ask-foot">
 					<span id="ask-count" className={text.length >= WARN_CHARS ? "counter near" : "counter"} aria-live="polite">{text.length >= WARN_CHARS ? `${text.length}/${MAX_CHARS}` : ""}</span>
@@ -136,10 +141,10 @@ export function Planner() {
 			<div className="group-head"><h2>What I understood</h2><span className="note">Tap a chip to change it. The plan updates right away.</span></div>
 			<ul className="chip-row">
 				{view.goal.wishes.map(w => <ChipEditor key={w.id} label={`buy: ${w.name}`}>
-					{() => <WishEditor wish={w} goal={view.goal} options={alternativesFor(w)} busy={busy} onApply={goal => void send({ type: "update-goal", goal })} />}
+					{() => <WishEditor wish={w} goal={view.goal} options={alternativesFor(w)} busy={busy} onApply={goal => void send({ type: "update-goal", goal: retitle(view.goal, goal) })} />}
 				</ChipEditor>)}
 				{view.goal.assets.map(a => <ChipEditor key={a.id} label={`sell: ${a.name}, ${a.condition}`}>
-					{() => <AssetEditor asset={a} goal={view.goal} busy={busy} onApply={goal => void send({ type: "update-goal", goal })} />}
+					{() => <AssetEditor asset={a} goal={view.goal} busy={busy} onApply={goal => void send({ type: "update-goal", goal: retitle(view.goal, goal) })} />}
 				</ChipEditor>)}
 			</ul>
 		</section>
