@@ -58,17 +58,25 @@ export function useSearch() {
 	const [running, setRunning] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const source = useRef<EventSource | null>(null)
+	/** The search still running on the server, so it can be cancelled when abandoned. */
+	const current = useRef<string | null>(null)
 
 	const close = useCallback(() => {
 		source.current?.close()
 		source.current = null
 	}, [])
 
-	useEffect(() => close, [close])
+	const abandon = useCallback(() => {
+		if (current.current) void fetch(`/api/search/${current.current}/cancel`, { method: "POST", keepalive: true }).catch(() => undefined)
+		current.current = null
+		close()
+	}, [close])
+
+	useEffect(() => abandon, [abandon])
 
 	const run = useCallback(
 		async (request: SearchRequest) => {
-			close()
+			abandon()
 			store.clear()
 			setView(null)
 			setError(null)
@@ -79,8 +87,14 @@ export function useSearch() {
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify(request),
 				})
+				if (res.status === 429) {
+					setRunning(false)
+					setError("Previše pretraga u isto vreme. Pokušaj ponovo za par sekundi.")
+					return
+				}
 				if (!res.ok) throw new Error(`POST /api/search ${res.status}`)
 				const { id } = (await res.json()) as { id: string }
+				current.current = id
 
 				const es = new EventSource(`/api/search/${id}/stream`)
 				source.current = es
@@ -92,6 +106,7 @@ export function useSearch() {
 					const v = JSON.parse(m.data) as SearchView
 					setView(v)
 					if (v.done) {
+						current.current = null
 						close()
 						setRunning(false)
 					}
@@ -109,7 +124,7 @@ export function useSearch() {
 				setError(FAILED)
 			}
 		},
-		[close, store],
+		[abandon, close, store],
 	)
 
 	return { view, store, running, error, run }

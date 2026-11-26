@@ -11,6 +11,8 @@ import type { Category, SearchMode, SearchRequest } from "./search/types"
 
 const PORT = Number(process.env.PORT ?? 8787)
 const PROD = process.argv.includes("--prod")
+/** Each search pages every source, so cap how many run at once. */
+const MAX_RUNNING = 20
 
 const state = startEngine()
 
@@ -70,6 +72,8 @@ async function api(req: IncomingMessage, res: ServerResponse, path: string): Pro
 	if (req.method === "POST" && path === "/api/search") {
 		const request = toRequest(await readBody(req).catch(() => null))
 		if (!request) return json(res, 400, { error: "query required (budget mode: budget and query or category)" })
+		const running = [...state.sessions.values()].filter((s) => !s.done && !s.cancelled).length
+		if (running >= MAX_RUNNING) return json(res, 429, { error: "too many searches running, try again in a few seconds" })
 		return json(res, 200, { id: search(request) })
 	}
 	const m = /^\/api\/search\/([\w-]+)\/(stream|cancel)$/.exec(path)
@@ -101,3 +105,12 @@ createServer((req, res) => {
 	res.writeHead(200, { "Content-Type": MIME[extname(target)] ?? "application/octet-stream" })
 	createReadStream(target).pipe(res)
 }).listen(PORT, () => console.log(`RealDeal on http://localhost:${PORT}${PROD ? "" : " (dev)"}`))
+
+// With a token, the Telegram bot runs in this process too, so web and bot searches share the same agents.
+const token = process.env.TELEGRAM_BOT_TOKEN?.trim()
+if (token) {
+	const { createBot } = await import("./bot/bot")
+	createBot(token)
+		.start({ onStart: (me) => console.log(`Telegram bot @${me.username} running`) })
+		.catch((err) => console.error("[bot] could not start, the web server keeps running:", err))
+}

@@ -207,15 +207,18 @@ function rowLine(row: ResultRow): string {
 
 function pickBlock(view: SearchView): string[] {
 	const { request, picks } = view
+	const budget = request.mode === "budget"
 	if (picks.length === 0) {
+		if (!budget) return []
 		return [view.done ? "Nijedan oglas se ne uklapa u budžet." : "Tražim predloge…"]
 	}
 	const rows = new Map(view.groups.flatMap((g) => g.rows).map((r) => [r.key, r] as const))
-	const lines = [`<b>Najbolje za ${formatPrice(request.budget ?? 0)}:</b>`]
+	const lines = [budget ? `<b>Najbolje za ${formatPrice(request.budget ?? 0)}:</b>` : "<b>Najbolje cene:</b>"]
 	picks.slice(0, 3).forEach((pick, i) => {
 		const row = rows.get(pick.key)
 		const name = row ? link(pick.name, row.url) : esc(pick.name)
-		lines.push(`${i + 1}. <b>${name}</b> — ${formatPrice(pick.total)} · ostaje ${formatPrice(pick.leftover)}`)
+		const leftover = budget ? ` · ostaje ${formatPrice(pick.leftover)}` : ""
+		lines.push(`${i + 1}. <b>${name}</b> — ${formatPrice(pick.total)}${leftover}`)
 		lines.push(`   <i>${esc(pick.why)}</i>`)
 	})
 	return [lines.join("\n")]
@@ -271,7 +274,7 @@ export function formatView(view: SearchView): string {
 	if (view.request.mode === "sell") {
 		blocks = sellBlock(view)
 	} else {
-		blocks = view.request.mode === "budget" ? pickBlock(view) : []
+		blocks = pickBlock(view)
 		blocks.push(...view.groups.slice(0, 5).map(groupBlock))
 	}
 

@@ -9,7 +9,7 @@ import { emit, join, resolveRuntime, Session } from "../runtime"
 import { startEngine } from "./agents"
 import { PRODUCTS, productName } from "./catalogue"
 import { EV, type SearchRequested } from "./events"
-import { choosePicks } from "./rank"
+import { choosePicks, withinBudget } from "./rank"
 import type { ProductGroup, SearchRequest, SearchView } from "./types"
 
 export type { SearchRequest, SearchView }
@@ -83,8 +83,12 @@ export function getView(searchId: string): SearchView | null {
 	ensureStarted()
 	const s = resolveRuntime().state.session(searchId)
 	if (!s) return null
+	const rows = [...s.rows.values()]
+	const budget = s.request.mode === "budget" ? (s.request.budget ?? null) : null
+	// In budget mode nothing over the budget is shown at all, not just never picked.
+	const shown = budget != null ? withinBudget(rows, budget) : rows
 	const byProduct = new Map<string, ProductGroup>()
-	for (const r of s.rows.values()) {
+	for (const r of shown) {
 		let g = byProduct.get(r.productId)
 		if (!g) {
 			const p = PRODUCTS.get(r.productId)!
@@ -104,8 +108,6 @@ export function getView(searchId: string): SearchView | null {
 	const wanted = new Set(s.plan?.productIds ?? [])
 	groups.sort((a, b) => Number(wanted.has(b.productId)) - Number(wanted.has(a.productId)) || PRODUCTS.get(b.productId)!.score - PRODUCTS.get(a.productId)!.score)
 
-	const rows = [...s.rows.values()]
-	const budget = s.request.mode === "budget" ? (s.request.budget ?? null) : null
 	return {
 		id: s.id,
 		request: s.request,

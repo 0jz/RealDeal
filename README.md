@@ -7,7 +7,7 @@ One query searches KupujemProdajem, eponuda and Cenoteka at once. A swarm of con
 Three modes, on the web and in a Telegram bot:
 
 - **Pretraga (search):** every matching listing from every source, grouped by model, with a price verdict.
-- **Budžet (budget):** "the best phone for 100.000 RSD". The budget is a **hard cap**: price plus delivery is never over it, enforced in code and covered by tests ([src/search/rank.test.ts](src/search/rank.test.ts)).
+- **Budžet (budget):** "the best phone for 100.000 RSD". The budget is a **hard cap**: nothing whose price plus delivery is over it is picked or even listed. Enforced in code and covered by tests ([src/search/rank.test.ts](src/search/rank.test.ts), [src/bot/bot.test.ts](src/bot/bot.test.ts)).
 - **Prodaja (sell):** describe what you have; get a quick-sale and a patient price from comparable listings, plus a draft ad. RealDeal never posts anything for you.
 
 ## Run
@@ -16,8 +16,9 @@ Three modes, on the web and in a Telegram bot:
 npm i
 npm run dev        # server + UI on http://localhost:8787
 npm run check      # three searches at once, prints a summary and 11 self-checks (`-- --log` prints every event)
-npm test           # matcher (115 labelled titles), budget cap, sources, bot formatting
-npm run bot        # Telegram bot; needs TELEGRAM_BOT_TOKEN in .env
+npm test           # matcher (115 labelled titles), budget cap, sources, the bot's commands against a fake Telegram API
+npm run bot        # Telegram bot on its own; needs TELEGRAM_BOT_TOKEN in .env
+                   # (with the token set, `npm run dev` / `npm start` also run the bot, sharing the same agents)
 npm run fixtures   # regenerates the demo data in data/fixtures
 npm run build      # builds the UI into web/dist; `npm start` then serves it
 npm run typecheck

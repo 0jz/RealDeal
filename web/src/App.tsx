@@ -188,7 +188,7 @@ export function App() {
 			)}
 
 			{view && view.request.mode !== "sell" && <Sources sources={view.sources} />}
-			{view && view.request.mode === "budget" && <Picks view={view} />}
+			{view && (view.request.mode === "budget" || (view.request.mode === "search" && view.picks.length > 0)) && <Picks view={view} />}
 
 			<main className="results">
 				{view?.request.mode === "sell" ? (
@@ -232,18 +232,18 @@ function Sources({ sources }: { sources: SourceStatus[] }) {
 }
 
 function Picks({ view }: { view: SearchView }) {
-	const budget = view.request.budget ?? 0
+	const budget = view.request.mode === "budget" ? (view.request.budget ?? 0) : null
 	const rows = new Map<string, ResultRow>(view.groups.flatMap((g) => g.rows).map((r) => [r.key, r] as const))
 
 	return (
 		<section className="picks" aria-labelledby="picks-title">
-			<h2 id="picks-title">Najbolje za {rsd(budget)}</h2>
+			<h2 id="picks-title">{budget !== null ? `Najbolje za ${rsd(budget)}` : "Najbolje cene"}</h2>
 			{view.picks.length === 0 ? (
 				<p className="empty">{view.done ? "Ništa ne staje u ovaj budžet." : "Tražim najbolju kupovinu…"}</p>
 			) : (
 				<ol className="pick-list">
 					{view.picks.slice(0, 3).map((p, i) => (
-						<PickRow key={p.key} pick={p} rank={i + 1} row={rows.get(p.key)} />
+						<PickRow key={p.key} pick={p} rank={i + 1} row={rows.get(p.key)} showLeftover={budget !== null} />
 					))}
 				</ol>
 			)}
@@ -251,7 +251,7 @@ function Picks({ view }: { view: SearchView }) {
 	)
 }
 
-function PickRow({ pick, rank, row }: { pick: PickItem; rank: number; row: ResultRow | undefined }) {
+function PickRow({ pick, rank, row, showLeftover }: { pick: PickItem; rank: number; row: ResultRow | undefined; showLeftover: boolean }) {
 	return (
 		<li className="pick">
 			<span className="pick-rank">{rank}</span>
@@ -261,7 +261,7 @@ function PickRow({ pick, rank, row }: { pick: PickItem; rank: number; row: Resul
 			</div>
 			<div className="pick-money">
 				<strong>{rsd(pick.total)}</strong>
-				<span className="sub">ostaje {rsd(pick.leftover)}</span>
+				{showLeftover && <span className="sub">ostaje {rsd(pick.leftover)}</span>}
 				{row && (
 					<a href={row.url} target="_blank" rel="noopener noreferrer">
 						Otvori ↗
