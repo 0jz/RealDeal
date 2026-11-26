@@ -12,7 +12,7 @@ const rsd = (n: number) => `${n.toLocaleString("sr-RS")} RSD`
  * Rule-based verdict from whatever has been reported so far. Called again on
  * every new input, so the verdict for an offer can change several times.
  */
-export function decide(r: VerdictRecord, trust: number, shopName: string): { verdict: Verdict; reason: string } {
+export function decide(r: VerdictRecord, trust: number, shopName: (id: string) => string): { verdict: Verdict; reason: string } {
 	const d = r.discount
 	if (!d) return { verdict: "CHECKING", reason: "Waiting for the 30-day check" }
 
@@ -26,10 +26,10 @@ export function decide(r: VerdictRecord, trust: number, shopName: string): { ver
 		return { verdict: "BUY ON KP INSTEAD", reason: `Sealed on KP for ${rsd(r.kp.sealedLow)} vs ${rsd(r.price)} here` }
 	}
 	if (r.crossShop?.bestPrice != null && r.crossShop.bestPrice < r.price * CROSS_SHOP_MARGIN) {
-		return { verdict: "WAIT", reason: `Cheaper at ${r.crossShop.bestShopId}: ${rsd(r.crossShop.bestPrice)}` }
+		return { verdict: "WAIT", reason: `Cheaper at ${shopName(r.crossShop.bestShopId!)}: ${rsd(r.crossShop.bestPrice)}` }
 	}
 	if (trust < TRUST_THRESHOLD) {
-		return { verdict: "WAIT", reason: `${shopName} was caught faking discounts (trust ${trust}/100)` }
+		return { verdict: "WAIT", reason: `${shopName(r.shopId)} was caught faking discounts (trust ${trust}/100)` }
 	}
 	if (d.realDiscountPct >= MIN_REAL_DISCOUNT_PCT) {
 		return { verdict: "REAL DEAL", reason: `Really ${d.realDiscountPct}% below the ${d.windowDays}-day low` }

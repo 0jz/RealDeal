@@ -14,8 +14,10 @@ Since 1 May 2026, Serbian consumer protection law requires the advertised "previ
 
 ```bash
 npm i
-npm run dev        # runs the swarm, prints a summary and self-checks (add `-- --log` for every event)
+npm run dev        # server + live UI on http://localhost:8787 (SSE stream at /events)
+npm run check      # headless run of the full feed, prints a summary and self-checks (add `-- --log` for every event)
 npm run data       # writes data/out/dataset.json, checks every planted pattern
+npm run build      # builds the UI into web/dist; `npm start` then serves it
 npm run typecheck
 ```
 

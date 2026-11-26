@@ -6,7 +6,7 @@ import { resolveRuntime } from "../runtime"
 // `on` wraps that: it logs start/end for the timeline and catches errors so one
 // failing agent never takes the others down.
 
-class EventTypeIs extends SituationSpecification {
+export class EventTypeIs extends SituationSpecification {
 	constructor(private readonly types: readonly string[]) {
 		super()
 	}
@@ -14,6 +14,8 @@ class EventTypeIs extends SituationSpecification {
 		return this.types.includes(event.type)
 	}
 }
+
+let runCounter = 0
 
 export function on<T>(
 	types: readonly string[],
@@ -28,12 +30,13 @@ export function on<T>(
 				// every participant before any of them starts working.
 				await Promise.resolve()
 				const state = resolveRuntime().state
-				state.record({ agent: agentName, kind: "start", event: event.type })
+				const id = ++runCounter
+				state.record({ agent: agentName, kind: "start", event: event.type, run: id })
 				try {
 					const detail = await run(event.payload as T, event, participant.getId())
-					state.record({ agent: agentName, kind: "end", event: event.type, detail: detail ?? undefined })
+					state.record({ agent: agentName, kind: "end", event: event.type, run: id, detail: detail ?? undefined })
 				} catch (err) {
-					state.record({ agent: agentName, kind: "error", event: event.type, detail: String(err) })
+					state.record({ agent: agentName, kind: "error", event: event.type, run: id, detail: String(err) })
 				}
 			},
 		},

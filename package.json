@@ -5,17 +5,26 @@
 	"type": "module",
 	"private": true,
 	"scripts": {
-		"dev": "tsx src/main.ts",
+		"dev": "tsx src/server.ts",
+		"build": "vite build --config web/vite.config.ts",
+		"start": "tsx src/server.ts --prod",
+		"check": "tsx src/check.ts",
 		"data": "tsx src/data/cli.ts",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit && tsc --noEmit -p web"
 	},
 	"dependencies": {
 		"@mozaik-ai/core": "6.0.0",
-		"dotenv": "^17.4.2"
+		"dotenv": "^17.4.2",
+		"react": "^19.3.1",
+		"react-dom": "^19.3.1"
 	},
 	"devDependencies": {
 		"@types/node": "^24.0.0",
+		"@types/react": "^19.3.3",
+		"@types/react-dom": "^19.3.0",
+		"@vitejs/plugin-react": "^5.2.0",
 		"tsx": "^4.23.13",
-		"typescript": "^7.0.2"
+		"typescript": "^7.0.2",
+		"vite": "^7.3.8"
 	}
 }

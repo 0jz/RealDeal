@@ -21,7 +21,7 @@ const NAME = "VerdictAgent"
 /** Recompute one offer and emit verdict.updated if the verdict changed. Returns true if it flipped. */
 function rescore(rec: VerdictRecord, selfId: string, cause: string): boolean {
 	const { trust, data } = resolveRuntime().state
-	const shopName = data.shops.find((s) => s.id === rec.shopId)!.name
+	const shopName = (id: string) => data.shops.find((s) => s.id === id)?.name ?? id
 	const next = decide(rec, trust.get(rec.shopId)!, shopName)
 	const previous = rec.verdict
 	rec.reason = next.reason

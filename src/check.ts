@@ -1,30 +1,21 @@
 import "dotenv/config"
-import { crossShopAgent } from "./agents/crossShop"
 import { EV } from "./agents/events"
-import { kpMarketAgent } from "./agents/kpMarket"
-import { priceFeed, runFeed } from "./agents/priceFeed"
-import { shopTrustAgent } from "./agents/shopTrust"
-import { thirtyDayAgent } from "./agents/thirtyDay"
-import { verdictAgent } from "./agents/verdict"
 import { delay } from "./agents/kit"
-import { generate } from "./data/generate"
-import { initializeRuntime, join, MarketState } from "./runtime"
+import { emitPrice, feedQueue } from "./agents/priceFeed"
+import { startSwarm } from "./swarm"
 
-// `npm run dev` prints a summary and self-checks; `npm run dev -- --log` also prints every event.
+// `npm run check` runs the swarm headless, prints a summary and self-checks;
+// `npm run check -- --log` also prints every event.
 
-const runtime = initializeRuntime({ state: new MarketState(generate(2611)) })
+const state = startSwarm(2611)
 
-join(priceFeed)
-join(thirtyDayAgent)
-join(kpMarketAgent)
-join(crossShopAgent)
-join(shopTrustAgent)
-join(verdictAgent)
-
-await runFeed({ count: 40, intervalMs: 60 })
+for (const o of feedQueue()) {
+	emitPrice(o)
+	await delay(20)
+}
 await delay(1000) // let in-flight handlers finish
 
-const { log, verdicts, trust, data } = runtime.state
+const { log, verdicts, trust, data } = state
 
 if (process.argv.includes("--log")) {
 	for (const e of log) {
