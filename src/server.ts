@@ -2,122 +2,81 @@ import "dotenv/config"
 import { createReadStream, existsSync } from "node:fs"
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
 import { extname, join, normalize } from "node:path"
-import type { VerdictUpdated } from "./agents/events"
-import { offerKey, type LogEntry } from "./runtime"
-import { Feed, observeVerdicts, startSwarm } from "./swarm"
+import { resolveRuntime, type LogEntry } from "./runtime"
+import { cancel, search, startEngine, subscribe } from "./search/engine"
+import type { Category, SearchMode, SearchRequest } from "./search/types"
 
-// One process: the Mozaik swarm, a small JSON API, an SSE stream, and the UI
-// (Vite middleware in dev, the built files with --prod).
+// One process: the Mozaik search swarm, a small JSON API, an SSE stream per
+// search, and the UI (Vite middleware in dev, the built files with --prod).
 
 const PORT = Number(process.env.PORT ?? 8787)
 const PROD = process.argv.includes("--prod")
 
-const state = startSwarm(2611)
-const feed = new Feed(state)
-const flips: Array<VerdictUpdated & { t: number }> = []
-observeVerdicts((u) => {
-	flips.push(u)
-	if (flips.length > 40) flips.shift()
-}, state)
-
-// ---- SSE ----------------------------------------------------------------
-
-const clients = new Set<ServerResponse>()
-let pendingLog: LogEntry[] = []
-let dirty = true
-
-state.onRecord((e) => {
-	pendingLog.push(e)
-	dirty = true
-})
+const state = startEngine()
 
 function send(res: ServerResponse, event: string, data: unknown) {
 	res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
 }
 
-function snapshot() {
-	const offers = [...state.verdicts.values()].map((v) => {
-		const shown = state.prices.get(offerKey(v.shopId, v.skuId))!
-		return {
-			key: offerKey(v.shopId, v.skuId),
-			shopId: v.shopId,
-			skuId: v.skuId,
-			price: v.price,
-			shownPrevPrice: shown.shownPrevPrice,
-			realLow: v.discount?.realLow ?? null,
-			windowDays: v.discount?.windowDays ?? null,
-			claimedPct: v.discount?.claimedDiscountPct ?? null,
-			realPct: v.discount?.realDiscountPct ?? null,
-			kpSealed: v.kp?.sealedLow ?? null,
-			bestShopId: v.crossShop?.bestShopId ?? null,
-			bestPrice: v.crossShop?.bestPrice ?? null,
-			verdict: v.verdict,
-			reason: v.reason,
-		}
-	})
-	return {
-		running: feed.running,
-		speed: feed.speed,
-		emitted: feed.emitted,
-		total: feed.total,
-		trust: Object.fromEntries(state.trust),
-		offers,
-		flips: [...flips].reverse(),
+const json = (res: ServerResponse, status: number, body: unknown): void => void res.writeHead(status, { "Content-Type": "application/json" }).end(JSON.stringify(body))
+
+async function readBody(req: IncomingMessage): Promise<unknown> {
+	let size = 0
+	const chunks: Buffer[] = []
+	for await (const c of req) {
+		size += (c as Buffer).length
+		if (size > 10_000) throw new Error("body too large")
+		chunks.push(c as Buffer)
 	}
+	return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}")
 }
 
-// Batch: timeline entries every 100 ms, a state snapshot when something changed.
-setInterval(() => {
-	if (pendingLog.length) {
-		for (const c of clients) send(c, "log", pendingLog)
-		pendingLog = []
-	}
-	if (dirty) {
-		const s = snapshot()
-		for (const c of clients) send(c, "state", s)
-		dirty = false
-	}
-}, 100)
+const MODES: SearchMode[] = ["search", "budget", "sell"]
+const CATEGORIES: Category[] = ["phone", "laptop", "tablet", "console", "tv", "headphones", "gpu", "watch"]
 
-function openStream(req: IncomingMessage, res: ServerResponse) {
+function toRequest(body: unknown): SearchRequest | null {
+	const b = body as Partial<SearchRequest>
+	const query = typeof b.query === "string" ? b.query.trim().slice(0, 300) : ""
+	const mode = MODES.includes(b.mode as SearchMode) ? (b.mode as SearchMode) : "search"
+	const category = CATEGORIES.includes(b.category as Category) ? (b.category as Category) : null
+	const budget = typeof b.budget === "number" && b.budget > 0 ? Math.round(b.budget) : null
+	if (!query && !(mode === "budget" && category)) return null
+	if (mode === "budget" && !budget) return null
+	return { mode, query, category, budget, origin: "web" }
+}
+
+/** One SSE stream per search: its live view and the agent log entries that belong to it. */
+function openStream(id: string, req: IncomingMessage, res: ServerResponse) {
 	res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" })
-	send(res, "meta", { shops: state.data.shops, skus: state.data.skus, startedAt: state.startedAt, now: Date.now() })
-	send(res, "log", state.log.slice(-400))
-	send(res, "state", snapshot())
-	clients.add(res)
-	req.on("close", () => clients.delete(res))
+	send(res, "meta", { startedAt: state.startedAt, now: Date.now() })
+	send(res, "log", state.log.filter((e) => e.searchId === id))
+	let pending: LogEntry[] = []
+	const offLog = state.onRecord((e) => {
+		if (e.searchId === id) pending.push(e)
+	})
+	const flush = setInterval(() => {
+		if (pending.length) send(res, "log", pending)
+		pending = []
+	}, 100)
+	const offView = subscribe(id, (v) => send(res, "view", v))
+	req.on("close", () => {
+		offLog()
+		offView()
+		clearInterval(flush)
+	})
 }
 
-// ---- API ----------------------------------------------------------------
-
-function api(path: string, res: ServerResponse): boolean {
-	const ok = (body: unknown = {}) => {
-		dirty = true
-		res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(body))
+async function api(req: IncomingMessage, res: ServerResponse, path: string): Promise<void> {
+	if (req.method === "POST" && path === "/api/search") {
+		const request = toRequest(await readBody(req).catch(() => null))
+		if (!request) return json(res, 400, { error: "query required (budget mode: budget and query or category)" })
+		return json(res, 200, { id: search(request) })
 	}
-	switch (path) {
-		case "/api/start":
-			feed.start()
-			return ok(), true
-		case "/api/pause":
-			feed.pause()
-			return ok(), true
-		case "/api/speed/1":
-		case "/api/speed/10":
-			feed.setSpeed(Number(path.split("/").pop()))
-			return ok(), true
-		case "/api/inject": {
-			const o = feed.injectFake()
-			return ok({ injected: o ? offerKey(o.shopId, o.skuId) : null }), true
-		}
-		case "/api/reset":
-			feed.reset()
-			flips.length = 0
-			pendingLog = []
-			for (const c of clients) send(c, "reset", { startedAt: state.startedAt, now: Date.now() })
-			return ok(), true
-	}
-	return false
+	const m = /^\/api\/search\/([\w-]+)\/(stream|cancel)$/.exec(path)
+	if (m && !resolveRuntime().state.session(m[1])) return json(res, 404, { error: "unknown search" })
+	if (m && req.method === "GET" && m[2] === "stream") return openStream(m[1], req, res)
+	if (m && req.method === "POST" && m[2] === "cancel") return cancel(m[1]), json(res, 200, {})
+	json(res, 404, { error: "not found" })
 }
 
 // ---- HTTP ---------------------------------------------------------------
@@ -131,9 +90,8 @@ const vite = PROD
 
 createServer((req, res) => {
 	const path = new URL(req.url ?? "/", "http://x").pathname
-	if (path === "/events") return openStream(req, res)
 	if (path.startsWith("/api/")) {
-		if (req.method !== "POST" || !api(path, res)) res.writeHead(404).end()
+		api(req, res, path).catch((err) => json(res, 500, { error: String(err) }))
 		return
 	}
 	if (vite) return vite.middlewares(req, res)

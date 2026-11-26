@@ -1,20 +1,23 @@
 {
 	"name": "realdeal",
 	"version": "0.1.0",
-	"description": "Buyer-side agent swarm that catches fake Black Friday discounts (Serbia's 30-day rule). Team JDI, built on Mozaik.",
+	"description": "Serbian electronics search engine: KP, shops and price comparison sites searched at once by a concurrent Mozaik agent swarm, with a website and a Telegram bot. Team JDI.",
 	"type": "module",
 	"private": true,
 	"scripts": {
 		"dev": "tsx src/server.ts",
 		"build": "vite build --config web/vite.config.ts",
 		"start": "tsx src/server.ts --prod",
+		"bot": "tsx src/bot/main.ts",
 		"check": "tsx src/check.ts",
-		"data": "tsx src/data/cli.ts",
+		"fixtures": "tsx src/sources/fixtures/generate.ts",
+		"test": "node --import tsx --test \"src/**/*.test.ts\"",
 		"typecheck": "tsc --noEmit && tsc --noEmit -p web"
 	},
 	"dependencies": {
 		"@mozaik-ai/core": "6.0.0",
 		"dotenv": "^17.4.2",
+		"grammy": "^1.48.0",
 		"react": "^19.3.1",
 		"react-dom": "^19.3.1",
 		"tsx": "^4.23.13"

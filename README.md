@@ -1,39 +1,58 @@
 # RealDeal
 
-> **No fake discounts. Just do it.** · Team **JDI** · JigJoy Black Friday AI Hackathon 2026
+> Electronics search for Serbia that understands how people actually write listings. Team **JDI** · JigJoy AI Hackathon 2026
 
-A live, buyer-side swarm of concurrent agents (built on [Mozaik](https://github.com/jigjoy-ai/mozaik)) that checks Black Friday "discounts" against Serbia's **30-day rule**, KP market prices, and other shops, and keeps a live verdict for every product on your watchlist:
+One query searches KupujemProdajem, eponuda and Cenoteka at once. A swarm of concurrent agents, built on [Mozaik](https://github.com/jigjoy-ai/mozaik), pages through each site, catches the right listings even when the title is misspelled ("ajfon 15 pro maks", "IPHONE15PROMAX", "Ајфон"), throws out look-alikes (cases, broken or locked phones, "kupujem" ads), and ranks what is left against the market price.
 
-**REAL DEAL · FAKE DISCOUNT · BUY ON KP INSTEAD · WAIT**
+Three modes, on the web and in a Telegram bot:
 
-## The 30-day rule
-
-Since 1 May 2026, Serbian consumer protection law requires the advertised "previous price" to be the **lowest price the shop offered in the 30 days before the sale** (at least 15 days for products in stock less than 30 days).
+- **Pretraga (search):** every matching listing from every source, grouped by model, with a price verdict.
+- **Budžet (budget):** "the best phone for 100.000 RSD". The budget is a **hard cap**: price plus delivery is never over it, enforced in code and covered by tests ([src/search/rank.test.ts](src/search/rank.test.ts)).
+- **Prodaja (sell):** describe what you have; get a quick-sale and a patient price from comparable listings, plus a draft ad. RealDeal never posts anything for you.
 
 ## Run
 
 ```bash
 npm i
-npm run dev        # server + live UI on http://localhost:8787 (SSE stream at /events)
-npm run check      # headless run of the full feed, prints a summary and self-checks (add `-- --log` for every event)
-npm run data       # writes data/out/dataset.json, checks every planted pattern
+npm run dev        # server + UI on http://localhost:8787
+npm run check      # three searches at once, prints a summary and 11 self-checks (`-- --log` prints every event)
+npm test           # matcher (115 labelled titles), budget cap, sources, bot formatting
+npm run bot        # Telegram bot; needs TELEGRAM_BOT_TOKEN in .env
+npm run fixtures   # regenerates the demo data in data/fixtures
 npm run build      # builds the UI into web/dist; `npm start` then serves it
 npm run typecheck
 ```
 
-## How agents run concurrently (so far)
+Optional: `OPENAI_API_KEY` in `.env` turns on an LLM fallback for titles the rules can't decide. Without it, those titles are left unmatched.
 
-Every agent is a Mozaik participant on one shared runtime. `publish()` hands each event to every participant's matching handler **without awaiting it**, so each agent's async handler runs on its own: when `price.changed` arrives, ThirtyDayAgent and KPMarketAgent both start on it at the same moment, and KP lookups from earlier events are still in flight while new prices arrive. There is no central scheduler. Agents publish their findings (`discount.fake`, `kp.price`, `crossshop.best`, …) as new events that other agents can react to:
+## How agents run concurrently
 
-- **VerdictAgent never waits for all results.** Each finding updates one field of the offer's record and the verdict is recomputed at once, so it can go CHECKING → REAL DEAL → BUY ON KP INSTEAD as agents report in.
-- **Cascade:** ThirtyDayAgent emits `discount.fake` → ShopTrustAgent lowers that shop's trust and emits `shop.trust.changed` → VerdictAgent re-scores every product from that shop. A fake costs 10 trust points and a discount that checks out wins back 3, so the score follows how often a shop fakes rather than how much it sells. The feed is scripted for the demo: DigiMax's honest deals land first, then its fakes, and once its trust falls under 60 its earlier REAL DEALs flip to WAIT on screen. Every emit/start/end is logged with a timestamp and agent name ([src/runtime.ts](src/runtime.ts), [src/agents/kit.ts](src/agents/kit.ts)).
+Every agent is a Mozaik participant on one shared runtime. `publish()` hands each event to every matching handler **without awaiting it**, so handlers run on their own and overlap. There is no scheduler and no "fan out, wait, aggregate" step. Every event carries a `searchId`, so many searches share the same agents at once.
 
-## Status
+| Agent | Reacts to | Emits |
+|---|---|---|
+| QueryAgent | `search.requested` | `search.planned` (spelling variants to search for, since the sites' own search is literal) |
+| Source:kp / Source:eponuda / Source:cenoteka | `search.planned`, its own `page.next` | `listing.found` per listing, then `page.next` for the next page, or `source.done` |
+| MatcherAgent | `listing.found` | `listing.matched` or `listing.rejected` |
+| PriceAgent | `listing.matched` | `price.assessed` (market price, flag) |
+| ShopCheckAgent | `listing.matched` from shops | `discount.checked` (Serbia's 30-day rule), `shop.trust.changed` |
+| RankerAgent | `price.assessed`, `discount.checked`, `shop.trust.changed` | `results.updated` |
+| SellAgent | `results.updated`, `source.done` in sell mode | `sell.estimate` |
 
-🚧 Work in progress. See [docs/PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md) for the full brief.
+- **Sources page themselves.** Each source agent emits its own `page.next`, so three sites page in parallel. Each one stops on its own: last page, page limit, time budget, enough matches, or a cancelled search.
+- **Results stream in.** The first matches reach the screen while the sources are still paging; the UI and the bot get throttled updates over SSE.
+- **Cascade:** when ShopCheckAgent catches a shop showing a fake "previous price", that shop's trust drops (−10 per fake, +3 per honest discount). RankerAgent then re-scores every row from that shop in every open search, and a shop under 60 trust is never picked.
 
-Coming in this README: architecture diagram, agent table, **how agents run concurrently**, run instructions, demo video, live link.
+`npm run check` proves this from the event log: peak handlers in flight, which agents overlapped, and that first results came before the last source finished.
 
-## Data
+## Sources and data
 
-All data in this project is **synthetic**. Shop names and prices are fictional and do not describe the behaviour of any real retailer.
+All data in this repository is **synthetic** ([data/fixtures](data/fixtures)). Shop names, sellers and prices are fictional and say nothing about any real retailer. Every source runs from fixtures by default, which imitate a site's literal search, its paging and its latency.
+
+Live fetching goes through [src/sources/http.ts](src/sources/http.ts): robots.txt check, rate limit, cache, backoff, and an honest User-Agent. No source is switched to live yet: KupujemProdajem's terms forbid automated collection, so the KP adapter stays fixture-only unless KP gives permission.
+
+## Docs
+
+- [docs/PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md): what we're building and the rules we hold to.
+- [docs/PIVOT_PROMPT.md](docs/PIVOT_PROMPT.md): the full spec for the pivot from the Black Friday checker.
+- [legacy/blackfriday](legacy/blackfriday): the original Black Friday fake-discount checker. Its 30-day rule lives on in [src/rules/thirtyDay.ts](src/rules/thirtyDay.ts).

@@ -2,19 +2,22 @@ import { useEffect, useRef, useState } from "react"
 import type { TimelineStore } from "./stream"
 
 export const LANES = [
-	{ agent: "PriceFeed", label: "Price feed", hint: "New Black Friday prices", color: "--ink" },
-	{ agent: "ThirtyDayAgent", label: "30-day check", hint: "Is the old price real?", color: "--fake" },
-	{ agent: "KPMarketAgent", label: "KP market", hint: "Same model on KP", color: "--kp" },
-	{ agent: "CrossShopAgent", label: "Other shops", hint: "Same model elsewhere", color: "--cross" },
-	{ agent: "ShopTrustAgent", label: "Shop trust", hint: "Who got caught", color: "--trust" },
-	{ agent: "VerdictAgent", label: "Verdict", hint: "Live call per product", color: "--real" },
+	{ agent: "QueryAgent", label: "Upit", hint: "Razume tekst pretrage", color: "--lane-query" },
+	{ agent: "Source:kp", label: "KupujemProdajem", hint: "Oglasi sa KP", color: "--lane-kp" },
+	{ agent: "Source:eponuda", label: "eponuda", hint: "Oglasi i prodavnice", color: "--lane-eponuda" },
+	{ agent: "Source:cenoteka", label: "Cenoteka", hint: "Poređenje cena", color: "--lane-cenoteka" },
+	{ agent: "MatcherAgent", label: "Prepoznavanje", hint: "Model iz naslova", color: "--lane-match" },
+	{ agent: "PriceAgent", label: "Tržišna cena", hint: "Medijana za model", color: "--lane-price" },
+	{ agent: "ShopCheckAgent", label: "30 dana i poverenje", hint: "Je li popust stvaran", color: "--lane-shop" },
+	{ agent: "RankerAgent", label: "Rangiranje", hint: "Ocena i izbor", color: "--lane-rank" },
+	{ agent: "SellAgent", label: "Prodaja", hint: "Procena i nacrt oglasa", color: "--lane-sell" },
 ] as const
 
 const WINDOW_MS = 6000
-const LANE_H = 52
-const ROW_H = 7
+const LANE_H = 40
+const ROW_H = 6
 const ROW_GAP = 2
-const MAX_ROWS = 5
+const MAX_ROWS = 4
 const AXIS_H = 20
 
 /**
@@ -63,11 +66,11 @@ export function Timeline({ store }: { store: TimelineStore }) {
 				ctx.fillStyle = grid
 				ctx.fillRect(gx, 0, 1, lanesH + 4)
 				ctx.fillStyle = muted
-				if (w > 420 || s % 2 === 0) ctx.fillText(`${s}s ago`, gx + 4, h - 2)
+				if (w > 420 || s % 2 === 0) ctx.fillText(`pre ${s} s`, gx + 4, h - 2)
 			}
 			ctx.fillStyle = muted
 			ctx.textAlign = "right"
-			ctx.fillText("now", w - 2, h - 2)
+			ctx.fillText("sada", w - 2, h - 2)
 			ctx.textAlign = "left"
 			for (let i = 1; i <= LANES.length; i++) {
 				ctx.fillStyle = grid
@@ -86,7 +89,7 @@ export function Timeline({ store }: { store: TimelineStore }) {
 			LANES.forEach((lane, li) => {
 				const runs = (byLane.get(lane.agent) ?? []).sort((a, b) => a.start - b.start)
 				const rowEnd: number[] = []
-				const top = li * LANE_H + 8
+				const top = li * LANE_H + 7
 				for (const r of runs) {
 					let row = rowEnd.findIndex((e) => e < r.start)
 					if (row < 0) row = rowEnd.length
@@ -108,7 +111,7 @@ export function Timeline({ store }: { store: TimelineStore }) {
 				const ex = x(e.t)
 				if (ex < 0) continue
 				ctx.fillStyle = laneColors[li]
-				ctx.fillRect(ex - 1, li * LANE_H + LANE_H - 9, 2, 6)
+				ctx.fillRect(ex - 1, li * LANE_H + LANE_H - 8, 2, 5)
 			}
 
 			const n = store.inFlight()
@@ -127,11 +130,11 @@ export function Timeline({ store }: { store: TimelineStore }) {
 	}, [store])
 
 	return (
-		<section className="timeline" aria-label="Live agent timeline">
+		<section className="timeline" aria-label="Živi tok agenata">
 			<div className="timeline-head">
-				<h2>Agents at work</h2>
+				<h2>Agenti u radu</h2>
 				<p className="timeline-count">
-					<strong>{inFlight}</strong> checks running right now, <strong>{peakShown}</strong> at most
+					<strong>{inFlight}</strong> provera u toku, najviše <strong>{peakShown}</strong> istovremeno
 				</p>
 			</div>
 			<div className="timeline-body">
@@ -146,7 +149,12 @@ export function Timeline({ store }: { store: TimelineStore }) {
 						</li>
 					))}
 				</ul>
-				<canvas ref={canvas} style={{ height: LANES.length * LANE_H + AXIS_H }} role="img" aria-label="Bars show each agent's checks over the last six seconds; stacked or aligned bars ran at the same time." />
+				<canvas
+					ref={canvas}
+					style={{ height: LANES.length * LANE_H + AXIS_H }}
+					role="img"
+					aria-label="Trake prikazuju rad svakog agenta u poslednjih šest sekundi. Trake poređane jedna iznad druge rade u isto vreme."
+				/>
 			</div>
 		</section>
 	)

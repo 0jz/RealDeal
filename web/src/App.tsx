@@ -1,188 +1,442 @@
-import { useMemo, useState } from "react"
-import { command, useStream, type OfferView, type Verdict } from "./stream"
+import { useState, type FormEvent } from "react"
+import { useSearch } from "./stream"
 import { Timeline } from "./Timeline"
+import type {
+	Category,
+	Condition,
+	MatchMethod,
+	Pick as PickItem,
+	PriceFlag,
+	ProductGroup,
+	ResultRow,
+	SearchMode,
+	SearchRequest,
+	SearchView,
+	SellEstimate,
+	SourceStatus,
+} from "./types"
 
 const rsd = (n: number) => `${n.toLocaleString("sr-RS")} RSD`
+const digitsOf = (s: string) => s.replace(/\D/g, "")
+const groupDigits = (d: string) => (d ? Number(d).toLocaleString("sr-RS") : "")
 
-const VERDICT_CLASS: Record<Verdict, string> = {
-	CHECKING: "checking",
-	"REAL DEAL": "real",
-	"FAKE DISCOUNT": "fake",
-	"BUY ON KP INSTEAD": "kp",
-	WAIT: "wait",
-}
-
-const FILTERS: Array<{ id: Verdict | "all"; label: string }> = [
-	{ id: "all", label: "All" },
-	{ id: "FAKE DISCOUNT", label: "Fake discounts" },
-	{ id: "REAL DEAL", label: "Real deals" },
-	{ id: "BUY ON KP INSTEAD", label: "Cheaper on KP" },
-	{ id: "WAIT", label: "Wait" },
+const MODES: { id: SearchMode; label: string; submit: string }[] = [
+	{ id: "search", label: "Pretraga", submit: "Traži" },
+	{ id: "budget", label: "Budžet", submit: "Nađi za budžet" },
+	{ id: "sell", label: "Prodaja", submit: "Proceni cenu" },
 ]
 
-const TRUST_THRESHOLD = 60
+const CATEGORIES: { id: Category; label: string }[] = [
+	{ id: "phone", label: "Telefon" },
+	{ id: "laptop", label: "Laptop" },
+	{ id: "tablet", label: "Tablet" },
+	{ id: "console", label: "Konzola" },
+	{ id: "tv", label: "TV" },
+	{ id: "headphones", label: "Slušalice" },
+	{ id: "gpu", label: "Grafička" },
+	{ id: "watch", label: "Sat" },
+]
+
+const CONDITION: Record<Condition, string> = { new: "novo", sealed: "zapečaćeno", used: "polovno" }
+const METHOD: Record<MatchMethod, string> = { rule: "tačno", fuzzy: "ispravljen pravopis", llm: "AI", none: "" }
+const FLAG: Record<PriceFlag, string> = {
+	great: "odlična cena",
+	good: "dobra",
+	fair: "ok",
+	high: "skupo",
+	suspicious: "sumnjivo jeftino",
+}
+
+type Example = { label: string; request: SearchRequest }
+
+const EXAMPLES: Example[] = [
+	{ label: "ajfon 15 pro maks", request: { mode: "search", query: "ajfon 15 pro maks" } },
+	{ label: "ps5 slim", request: { mode: "search", query: "ps5 slim" } },
+	{ label: "Telefon do 60.000 RSD", request: { mode: "budget", query: "telefon", budget: 60000, category: "phone" } },
+]
+
+/** A request the form can send, or null when the form is not complete yet. */
+function requestFor(mode: SearchMode, query: string, budget: number, category: Category | "", sell: string): SearchRequest | null {
+	if (mode === "sell") return sell.trim() ? { mode, query: sell.trim(), origin: "web" } : null
+	if (!query.trim()) return null
+	if (mode === "search") return { mode, query: query.trim(), origin: "web" }
+	return budget > 0 ? { mode, query: query.trim(), budget, category: category || null, origin: "web" } : null
+}
 
 export function App() {
-	const { store, meta, snap, connected } = useStream()
-	const [filter, setFilter] = useState<Verdict | "all">("all")
+	const { view, store, running, error, run } = useSearch()
+	const [mode, setMode] = useState<SearchMode>("search")
+	const [query, setQuery] = useState("")
+	const [amount, setAmount] = useState("")
+	const [category, setCategory] = useState<Category | "">("")
+	const [sellText, setSellText] = useState("")
 
-	const names = useMemo(() => {
-		const shop = new Map(meta?.shops.map((s) => [s.id, s.name]))
-		const sku = new Map(meta?.skus.map((s) => [s.id, s.name]))
-		return { shop: (id: string | null) => (id ? (shop.get(id) ?? id) : ""), sku: (id: string) => sku.get(id) ?? id }
-	}, [meta])
+	const budget = Number(digitsOf(amount))
+	const request = requestFor(mode, query, budget, category, sellText)
+	const submitLabel = MODES.find((m) => m.id === mode)!.submit
 
-	const offers = useMemo(() => [...(snap?.offers ?? [])].reverse(), [snap])
-	const counts = useMemo(() => {
-		const c: Record<string, number> = { all: offers.length }
-		for (const o of offers) c[o.verdict] = (c[o.verdict] ?? 0) + 1
-		return c
-	}, [offers])
-	const shown = filter === "all" ? offers : offers.filter((o) => o.verdict === filter)
+	const submit = (e: FormEvent) => {
+		e.preventDefault()
+		if (request) run(request)
+	}
 
-	const running = snap?.running ?? false
-	const done = snap ? snap.emitted > 0 && snap.emitted === snap.total : false
+	/** Fills the form with an example, so what the user sees matches what ran. */
+	const pickExample = (ex: Example) => {
+		const r = ex.request
+		setMode(r.mode)
+		if (r.mode === "sell") setSellText(r.query)
+		else {
+			setQuery(r.query)
+			setAmount(r.budget ? groupDigits(String(r.budget)) : "")
+			setCategory(r.category ?? "")
+		}
+		run(r)
+	}
+
+	const showTimeline = view !== null || running
 
 	return (
 		<div className="page">
 			<header className="masthead">
-				<div className="brand">
-					<h1>RealDeal</h1>
-					<p>No fake discounts. Just do it.</p>
-				</div>
-				<p className="intro">
-					Since 1 May 2026 a shop's "previous price" must be its lowest price in the last 30 days. Six agents check every Black Friday price as it
-					lands: the 30-day rule, the same model on KP, the other shops, and whether the shop has been caught before.
-				</p>
-				<div className="controls">
-					<button className="primary" onClick={() => command(running ? "pause" : "start")} disabled={!connected || done}>
-						{done ? "All prices in" : running ? "Pause" : snap?.emitted ? "Resume" : "Start Black Friday"}
-					</button>
-					<button aria-pressed={snap?.speed === 10} onClick={() => command(snap?.speed === 10 ? "speed/1" : "speed/10")} disabled={!connected}>
-						Speed ×10
-					</button>
-					<button onClick={() => command("inject")} disabled={!connected || done}>
-						Inject fake discount
-					</button>
-					<button className="quiet" onClick={() => command("reset")} disabled={!connected}>
-						Reset
-					</button>
-					<span className="progress" aria-live="polite">
-						{connected ? (snap ? `${snap.emitted} of ${snap.total} prices in` : "Connecting…") : "Server offline. Start it with npm run dev."}
-					</span>
-				</div>
+				<h1>RealDeal</h1>
+				<p className="tagline">Pretraga elektronike koja razume kako ljudi pišu oglase.</p>
 			</header>
 
-			<Timeline store={store} />
+			<section className="finder" aria-label="Pretraga">
+				<div className="modes" role="tablist" aria-label="Režim pretrage">
+					{MODES.map((m) => (
+						<button key={m.id} type="button" role="tab" aria-selected={mode === m.id} onClick={() => setMode(m.id)}>
+							{m.label}
+						</button>
+					))}
+				</div>
 
-			<main className="board">
-				<section className="offers" aria-label="Products">
-					<div className="filters" role="tablist">
-						{FILTERS.map((f) => (
-							<button key={f.id} role="tab" aria-selected={filter === f.id} onClick={() => setFilter(f.id)}>
-								{f.label} <span className="count">{counts[f.id] ?? 0}</span>
-							</button>
-						))}
-					</div>
-					{shown.length === 0 ? (
-						<p className="empty">{offers.length === 0 ? "Press Start Black Friday. Prices will appear here as the shops publish them." : "Nothing here yet."}</p>
+				<form className="finder-form" onSubmit={submit}>
+					{mode === "sell" ? (
+						<label className="field">
+							<span className="label">Opiši uređaj koji prodaješ</span>
+							<textarea rows={3} value={sellText} onChange={(e) => setSellText(e.target.value)} placeholder="iPhone 13 128GB polovan, baterija 86%" />
+						</label>
 					) : (
-						<ul className="cards">
-							{shown.map((o) => (
-								<Card key={o.key} o={o} names={names} />
+						<label className="field">
+							<span className="label">Šta tražiš?</span>
+							<input
+								type="text"
+								value={query}
+								onChange={(e) => setQuery(e.target.value)}
+								placeholder={mode === "budget" ? "telefon, laptop, ps5…" : "npr. ajfon 15 pro maks, ps5 slim"}
+								enterKeyHint="search"
+								autoComplete="off"
+							/>
+						</label>
+					)}
+
+					{mode === "budget" && (
+						<div className="fields">
+							<label className="field">
+								<span className="label">Budžet</span>
+								<span className="amount">
+									<input
+										type="text"
+										inputMode="numeric"
+										value={amount}
+										onChange={(e) => setAmount(groupDigits(digitsOf(e.target.value)))}
+										placeholder="60.000"
+									/>
+									<span className="unit">RSD</span>
+								</span>
+							</label>
+							<label className="field">
+								<span className="label">Kategorija</span>
+								<select value={category} onChange={(e) => setCategory(e.target.value as Category | "")}>
+									<option value="">Sve kategorije</option>
+									{CATEGORIES.map((c) => (
+										<option key={c.id} value={c.id}>
+											{c.label}
+										</option>
+									))}
+								</select>
+							</label>
+						</div>
+					)}
+
+					<button type="submit" className="primary" disabled={!request}>
+						{submitLabel}
+					</button>
+				</form>
+
+				{!showTimeline && (
+					<div className="examples">
+						<p className="label">Probaj jedan od primera</p>
+						<ul>
+							{EXAMPLES.map((ex) => (
+								<li key={ex.label}>
+									<button type="button" onClick={() => pickExample(ex)}>
+										{ex.label}
+									</button>
+								</li>
 							))}
 						</ul>
-					)}
-				</section>
+					</div>
+				)}
+			</section>
 
-				<aside className="side">
-					<section aria-label="Shop trust">
-						<h2>Shop trust</h2>
-						<ul className="trust">
-							{meta?.shops.map((s) => {
-								const t = snap?.trust[s.id] ?? 100
-								return (
-									<li key={s.id} className={t < TRUST_THRESHOLD ? "low" : ""}>
-										<span className="trust-name">{s.name}</span>
-										<span className="trust-bar">
-											<span style={{ width: `${t}%` }} />
-										</span>
-										<span className="trust-score">{t}</span>
-									</li>
-								)
-							})}
-						</ul>
-						<p className="note">A fake discount costs a shop 10 points, a discount that checks out wins back 3. Under {TRUST_THRESHOLD}, its other deals are put on hold.</p>
-					</section>
+			{error && (
+				<p className="alert" role="alert">
+					{error}
+				</p>
+			)}
 
-					<section aria-label="Latest verdict changes">
-						<h2>Latest changes</h2>
-						{snap?.flips.length ? (
-							<ol className="flips">
-								{snap.flips.slice(0, 14).map((f, i) => (
-									<li key={`${f.shopId}${f.skuId}${f.t}${i}`}>
-										<span className="flip-what">
-											{names.sku(f.skuId)} at {names.shop(f.shopId)}
-										</span>
-										<span className="flip-change">
-											{f.previous === "CHECKING" ? "" : `${label(f.previous)} to `}
-											<b className={`v-${VERDICT_CLASS[f.verdict]}`}>{label(f.verdict)}</b>
-											{f.cause === "shop.trust.changed" ? ", shop caught" : ""}
-										</span>
-									</li>
-								))}
-							</ol>
-						) : (
-							<p className="note">Verdicts that change show up here.</p>
-						)}
-					</section>
-				</aside>
+			{view && view.request.mode !== "sell" && <Sources sources={view.sources} />}
+			{view && view.request.mode === "budget" && <Picks view={view} />}
+
+			<main className="results">
+				{view?.request.mode === "sell" ? (
+					<SellPanel sell={view.sell} running={running} />
+				) : (
+					<Results view={view} running={running} />
+				)}
 			</main>
 
-			<footer className="foot">All shops, prices and KP listings are synthetic. Team JDI, JigJoy Black Friday AI Hackathon 2026.</footer>
+			{showTimeline && (
+				<section className="live" aria-label="Tok pretrage">
+					<p className="caption">Svi izvori i svi agenti rade u isto vreme. Trake ispod pokazuju šta se dešava u poslednjih šest sekundi.</p>
+					<Timeline store={store} />
+				</section>
+			)}
+
+			{view && (
+				<footer className="foot">
+					<p>{view.rejected} oglasa odbijeno (maske, delovi, iCloud lock, replike…)</p>
+					{view.sources.length > 0 && view.sources.every((s) => !s.live) && <p>Svi podaci su sintetički (demo)</p>}
+				</footer>
+			)}
 		</div>
 	)
 }
 
-const label = (v: Verdict) => (v === "BUY ON KP INSTEAD" ? "buy on KP" : v.toLowerCase())
-
-function Card({ o, names }: { o: OfferView; names: { shop: (id: string | null) => string; sku: (id: string) => string } }) {
-	const claims = o.shownPrevPrice > o.price
+function Sources({ sources }: { sources: SourceStatus[] }) {
 	return (
-		<li className={`card c-${VERDICT_CLASS[o.verdict]}`}>
-			<div className="card-top">
-				<div>
-					<h3>{names.sku(o.skuId)}</h3>
-					<p className="shop">{names.shop(o.shopId)}</p>
-				</div>
-				<span key={o.verdict} className={`stamp v-${VERDICT_CLASS[o.verdict]}`}>
-					{o.verdict === "CHECKING" ? "Checking" : o.verdict}
-				</span>
+		<ul className="sources" aria-label="Izvori">
+			{sources.map((s) => (
+				<li key={s.id} className={`src s-${s.state}`}>
+					<span className="src-name">{s.name}</span>
+					<span className="src-state">
+						{s.state === "done" ? `✓ ${s.found} oglasa, str. ${s.pages}` : s.state === "searching" ? "traži…" : "čeka"}
+					</span>
+					{!s.live && <span className="tag">demo podaci</span>}
+				</li>
+			))}
+		</ul>
+	)
+}
+
+function Picks({ view }: { view: SearchView }) {
+	const budget = view.request.budget ?? 0
+	const rows = new Map<string, ResultRow>(view.groups.flatMap((g) => g.rows).map((r) => [r.key, r] as const))
+
+	return (
+		<section className="picks" aria-labelledby="picks-title">
+			<h2 id="picks-title">Najbolje za {rsd(budget)}</h2>
+			{view.picks.length === 0 ? (
+				<p className="empty">{view.done ? "Ništa ne staje u ovaj budžet." : "Tražim najbolju kupovinu…"}</p>
+			) : (
+				<ol className="pick-list">
+					{view.picks.slice(0, 3).map((p, i) => (
+						<PickRow key={p.key} pick={p} rank={i + 1} row={rows.get(p.key)} />
+					))}
+				</ol>
+			)}
+		</section>
+	)
+}
+
+function PickRow({ pick, rank, row }: { pick: PickItem; rank: number; row: ResultRow | undefined }) {
+	return (
+		<li className="pick">
+			<span className="pick-rank">{rank}</span>
+			<div className="pick-body">
+				<h3>{pick.name}</h3>
+				<p className="pick-why">{pick.why}</p>
 			</div>
-			<p className="price">
-				<span className="now">{rsd(o.price)}</span>
-				{claims && (
-					<>
-						<s>{rsd(o.shownPrevPrice)}</s>
-						{o.claimedPct != null && <span className="claimed">−{o.claimedPct}%</span>}
-					</>
+			<div className="pick-money">
+				<strong>{rsd(pick.total)}</strong>
+				<span className="sub">ostaje {rsd(pick.leftover)}</span>
+				{row && (
+					<a href={row.url} target="_blank" rel="noopener noreferrer">
+						Otvori ↗
+					</a>
 				)}
-			</p>
-			<dl className="facts">
-				<div>
-					<dt>Real {o.windowDays ?? 30}-day low</dt>
-					<dd>{o.realLow != null ? `${rsd(o.realLow)} (${o.realPct! >= 0 ? "−" : "+"}${Math.abs(o.realPct!)}%)` : "checking"}</dd>
-				</div>
-				<div>
-					<dt>KP, sealed</dt>
-					<dd>{o.kpSealed != null ? rsd(o.kpSealed) : "none listed"}</dd>
-				</div>
-				<div>
-					<dt>Best other shop</dt>
-					<dd>{o.bestPrice != null ? `${rsd(o.bestPrice)}, ${names.shop(o.bestShopId)}` : "only seller"}</dd>
-				</div>
-			</dl>
-			{o.reason && <p className="reason">{o.reason}</p>}
+			</div>
 		</li>
+	)
+}
+
+function Results({ view, running }: { view: SearchView | null; running: boolean }) {
+	if (!view) return running ? <p className="empty">Pokrećem agente…</p> : null
+
+	const count = view.groups.reduce((n, g) => n + g.rows.length, 0)
+	const summary = `${view.groups.length} modela, ${count} oglasa`
+
+	return (
+		<>
+			<p className="status" aria-live="polite">
+				{view.done ? summary : `Još traži… ${summary} do sada`}
+			</p>
+			{view.groups.length === 0 ? (
+				<p className="empty">{view.done ? "Nismo našli oglase za ovaj upit." : "Tražim oglase…"}</p>
+			) : (
+				<ul className="groups">
+					{view.groups.map((g) => (
+						<GroupCard key={g.productId} group={g} />
+					))}
+				</ul>
+			)}
+		</>
+	)
+}
+
+function GroupCard({ group }: { group: ProductGroup }) {
+	return (
+		<li className="group">
+			<div className="group-head">
+				<h3>{group.name}</h3>
+				<p className="group-prices">
+					<span>
+						od <strong>{rsd(group.low)}</strong>
+					</span>
+					{group.market !== null && (
+						<span>
+							tržišna <strong>{rsd(group.market)}</strong>
+						</span>
+					)}
+				</p>
+			</div>
+			<ul className="rows">
+				<li className="rows-head" aria-hidden="true">
+					<span>Izvor</span>
+					<span>Naslov, kako ga piše prodavac</span>
+					<span>Cena</span>
+					<span>Stanje, mesto</span>
+					<span>Procena</span>
+					<span />
+				</li>
+				{group.rows.map((r, i) => (
+					<RowItem key={r.key} row={r} index={i} />
+				))}
+			</ul>
+		</li>
+	)
+}
+
+function RowItem({ row, index }: { row: ResultRow; index: number }) {
+	const ship = row.shipping === null ? "dostava nepoznata" : row.shipping === 0 ? "dostava besplatna" : `+ ${rsd(row.shipping)} dostava`
+
+	return (
+		<li className="row" style={{ animationDelay: `${Math.min(index, 12) * 30}ms` }}>
+			<span className="r-src">
+				<strong>{row.sourceName}</strong>
+				{row.shopName && <span className="sub">{row.shopName}</span>}
+				{row.shopTrust != null && <span className="sub">poverenje {row.shopTrust}</span>}
+			</span>
+			<span className="r-title">
+				“{row.title}”{row.why && <span className="why">{row.why}</span>}
+			</span>
+			<span className="r-price">
+				<strong>{rsd(row.price)}</strong>
+				<span className="sub">{ship}</span>
+			</span>
+			<span className="r-meta">
+				{row.condition && <span>{CONDITION[row.condition]}</span>}
+				{row.city && <span className="sub">{row.city}</span>}
+			</span>
+			<span className="r-badges">
+				{row.method !== "none" && <span className={`badge m-${row.method}`}>{METHOD[row.method]}</span>}
+				<span className="conf">{Math.round(row.confidence * 100)}%</span>
+				{row.flag && <span className={`flag f-${row.flag}`}>{FLAG[row.flag]}</span>}
+				{row.thirtyDay && !row.thirtyDay.legal && (
+					<span className="badge fake" title={`Najniža cena u poslednjih 30 dana: ${rsd(row.thirtyDay.realLow)}`}>
+						lažni popust
+					</span>
+				)}
+			</span>
+			<a className="r-link" href={row.url} target="_blank" rel="noopener noreferrer">
+				Otvori ↗
+			</a>
+		</li>
+	)
+}
+
+function SellPanel({ sell, running }: { sell: SellEstimate | null; running: boolean }) {
+	if (!sell) return running ? <p className="empty">Procenjujem cenu…</p> : null
+
+	const facts = [CONDITION[sell.condition], sell.storageGb ? `${sell.storageGb} GB` : null].filter(Boolean).join(" · ")
+
+	return (
+		<section className="sell" aria-label="Procena prodaje">
+			<div className="sell-head">
+				<div>
+					<h2>{sell.name ?? "Model nije prepoznat"}</h2>
+					<p className="sub">{facts}</p>
+				</div>
+				<dl className="sell-prices">
+					<div>
+						<dt>Brza prodaja</dt>
+						<dd>{sell.quick !== null ? rsd(sell.quick) : "—"}</dd>
+					</div>
+					<div>
+						<dt>Strpljivo</dt>
+						<dd>{sell.patient !== null ? rsd(sell.patient) : "—"}</dd>
+					</div>
+				</dl>
+			</div>
+			<p className="note">{sell.note}</p>
+
+			{sell.comps.length > 0 && (
+				<div className="block">
+					<h3 className="section-title">Slični oglasi</h3>
+					<ul className="comps">
+						{sell.comps.map((c) => (
+							<li key={c.key}>
+								<span>“{c.title}”</span>
+								<strong>{rsd(c.price)}</strong>
+								<a href={c.url} target="_blank" rel="noopener noreferrer">
+									Otvori ↗
+								</a>
+							</li>
+						))}
+					</ul>
+				</div>
+			)}
+
+			{sell.draft && <Draft title={sell.draft.title} description={sell.draft.description} />}
+		</section>
+	)
+}
+
+function Draft({ title, description }: { title: string; description: string }) {
+	const [copy, setCopy] = useState<"idle" | "ok" | "fail">("idle")
+
+	const onCopy = async () => {
+		try {
+			await navigator.clipboard.writeText(`${title}\n\n${description}`)
+			setCopy("ok")
+		} catch {
+			setCopy("fail")
+		}
+		setTimeout(() => setCopy("idle"), 1600)
+	}
+
+	return (
+		<div className="block draft">
+			<div className="draft-head">
+				<h3 className="section-title">Nacrt oglasa</h3>
+				<button type="button" className="ghost" onClick={onCopy}>
+					{copy === "ok" ? "Kopirano" : copy === "fail" ? "Nije uspelo" : "Kopiraj"}
+				</button>
+			</div>
+			<p className="draft-title">{title}</p>
+			<p className="draft-body">{description}</p>
+		</div>
 	)
 }

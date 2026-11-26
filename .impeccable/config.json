@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "web/src/styles.css"
+        ],
+        "createdAt": "2026-11-26T12:40:32.609Z",
+        "reason": "Claude triage: accent is border-top only and the top corners are square (border-radius 0 0 4px 4px), same pattern as commit ce9cf81"
+      }
+    ]
+  }
+}

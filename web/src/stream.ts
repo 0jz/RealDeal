@@ -1,39 +1,15 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import type { SearchRequest, SearchView } from "./types"
 
-export type Verdict = "CHECKING" | "REAL DEAL" | "FAKE DISCOUNT" | "BUY ON KP INSTEAD" | "WAIT"
-
-export type LogEntry = { t: number; agent: string; kind: "emit" | "start" | "end" | "error"; event: string; run?: number; detail?: string }
-
-export type OfferView = {
-	key: string
-	shopId: string
-	skuId: string
-	price: number
-	shownPrevPrice: number
-	realLow: number | null
-	windowDays: number | null
-	claimedPct: number | null
-	realPct: number | null
-	kpSealed: number | null
-	bestShopId: string | null
-	bestPrice: number | null
-	verdict: Verdict
-	reason: string
+export type LogEntry = {
+	t: number
+	agent: string
+	kind: "emit" | "start" | "end" | "error"
+	event: string
+	run?: number
+	detail?: string
+	searchId?: string
 }
-
-export type Flip = { shopId: string; skuId: string; verdict: Verdict; previous: Verdict; reason: string; cause: string; t: number }
-
-export type Snapshot = {
-	running: boolean
-	speed: number
-	emitted: number
-	total: number
-	trust: Record<string, number>
-	offers: OfferView[]
-	flips: Flip[]
-}
-
-export type Meta = { shops: { id: string; name: string }[]; skus: { id: string; name: string; category: string }[] }
 
 /** Timeline data lives outside React state: the canvas reads it every frame. */
 export class TimelineStore {
@@ -41,7 +17,7 @@ export class TimelineStore {
 	emits: { agent: string; t: number }[] = []
 	private base = { t: 0, perf: 0 }
 
-	/** Align the local clock with the server's run clock (ms since the run started). */
+	/** Align the local clock with the server's run clock (ms since the search started). */
 	sync(startedAt: number, serverNow: number) {
 		this.base = { t: serverNow - startedAt, perf: performance.now() }
 	}
@@ -73,33 +49,68 @@ export class TimelineStore {
 	}
 }
 
-export function useStream() {
+const FAILED = "Pretraga nije uspela. Proveri da li server radi i pokušaj ponovo."
+
+/** Starts a search on the server and follows its live view over SSE. */
+export function useSearch() {
 	const store = useRef(new TimelineStore()).current
-	const [meta, setMeta] = useState<Meta | null>(null)
-	const [snap, setSnap] = useState<Snapshot | null>(null)
-	const [connected, setConnected] = useState(false)
+	const [view, setView] = useState<SearchView | null>(null)
+	const [running, setRunning] = useState(false)
+	const [error, setError] = useState<string | null>(null)
+	const source = useRef<EventSource | null>(null)
 
-	useEffect(() => {
-		const es = new EventSource("/events")
-		es.addEventListener("open", () => setConnected(true))
-		es.addEventListener("error", () => setConnected(false))
-		es.addEventListener("meta", (m) => {
-			const d = JSON.parse(m.data)
-			store.clear()
-			store.sync(d.startedAt, d.now)
-			setMeta(d)
-		})
-		es.addEventListener("reset", (m) => {
-			const d = JSON.parse(m.data)
-			store.clear()
-			store.sync(d.startedAt, d.now)
-		})
-		es.addEventListener("log", (m) => store.add(JSON.parse(m.data)))
-		es.addEventListener("state", (m) => setSnap(JSON.parse(m.data)))
-		return () => es.close()
-	}, [store])
+	const close = useCallback(() => {
+		source.current?.close()
+		source.current = null
+	}, [])
 
-	return { store, meta, snap, connected }
+	useEffect(() => close, [close])
+
+	const run = useCallback(
+		async (request: SearchRequest) => {
+			close()
+			store.clear()
+			setView(null)
+			setError(null)
+			setRunning(true)
+			try {
+				const res = await fetch("/api/search", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(request),
+				})
+				if (!res.ok) throw new Error(`POST /api/search ${res.status}`)
+				const { id } = (await res.json()) as { id: string }
+
+				const es = new EventSource(`/api/search/${id}/stream`)
+				source.current = es
+				es.addEventListener("meta", (m: MessageEvent) => {
+					const d = JSON.parse(m.data) as { startedAt: number; now: number }
+					store.sync(d.startedAt, d.now)
+				})
+				es.addEventListener("view", (m: MessageEvent) => {
+					const v = JSON.parse(m.data) as SearchView
+					setView(v)
+					if (v.done) {
+						close()
+						setRunning(false)
+					}
+				})
+				es.addEventListener("log", (m: MessageEvent) => store.add(JSON.parse(m.data) as LogEntry[]))
+				es.onerror = () => {
+					// The browser retries while CONNECTING; CLOSED means the stream is gone for good.
+					if (es.readyState !== EventSource.CLOSED) return
+					source.current = null
+					setRunning(false)
+					setError(FAILED)
+				}
+			} catch {
+				setRunning(false)
+				setError(FAILED)
+			}
+		},
+		[close, store],
+	)
+
+	return { view, store, running, error, run }
 }
-
-export const command = (path: string) => fetch(`/api/${path}`, { method: "POST" })

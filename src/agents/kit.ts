@@ -17,13 +17,27 @@ export class EventTypeIs extends SituationSpecification {
 
 let runCounter = 0
 
+/** Matches events of the given types whose payload also passes `accept`. */
+export class EventMatches extends SituationSpecification {
+	constructor(
+		private readonly types: readonly string[],
+		private readonly accept: (payload: unknown) => boolean,
+	) {
+		super()
+	}
+	isSatisfiedBy({ event }: { event: SemanticEvent }): boolean {
+		return this.types.includes(event.type) && this.accept(event.payload)
+	}
+}
+
 export function on<T>(
 	types: readonly string[],
 	agentName: string,
 	run: (payload: T, event: SemanticEvent, selfId: string) => Promise<string | void>,
+	accept?: (payload: T) => boolean,
 ): SituationHandler {
 	return {
-		specification: new EventTypeIs(types),
+		specification: accept ? new EventMatches(types, accept as (p: unknown) => boolean) : new EventTypeIs(types),
 		processor: {
 			async apply({ event, participant }) {
 				// Yield first, so the publisher's loop finishes handing the event to
@@ -31,12 +45,13 @@ export function on<T>(
 				await Promise.resolve()
 				const state = resolveRuntime().state
 				const id = ++runCounter
-				state.record({ agent: agentName, kind: "start", event: event.type, run: id })
+				const searchId = (event.payload as { searchId?: string })?.searchId
+				state.record({ agent: agentName, kind: "start", event: event.type, run: id, searchId })
 				try {
 					const detail = await run(event.payload as T, event, participant.getId())
-					state.record({ agent: agentName, kind: "end", event: event.type, run: id, detail: detail ?? undefined })
+					state.record({ agent: agentName, kind: "end", event: event.type, run: id, detail: detail ?? undefined, searchId })
 				} catch (err) {
-					state.record({ agent: agentName, kind: "error", event: event.type, run: id, detail: String(err) })
+					state.record({ agent: agentName, kind: "error", event: event.type, run: id, detail: String(err), searchId })
 				}
 			},
 		},

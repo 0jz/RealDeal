@@ -1,4 +1,4 @@
-import type { Offer } from "../data/types"
+type Offer = { history: (number | null)[]; shownPrevPrice: number }
 
 export type ThirtyDayResult = {
 	/** Lowest real price in the reference window. */
