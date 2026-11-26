@@ -23,7 +23,7 @@ export type KpPrice = { skuId: string; shopId: string; shopPrice: number; sealed
 
 export type CrossShopBest = { skuId: string; shopId: string; shopPrice: number; bestShopId: string | null; bestPrice: number | null }
 
-export type ShopTrustChanged = { shopId: string; trust: number; previous: number; caughtSkuId: string }
+export type ShopTrustChanged = { shopId: string; trust: number; previous: number; skuId: string; caught: boolean }
 
 export type Verdict = "CHECKING" | "REAL DEAL" | "FAKE DISCOUNT" | "BUY ON KP INSTEAD" | "WAIT"
 

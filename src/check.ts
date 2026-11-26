@@ -2,12 +2,16 @@ import "dotenv/config"
 import { EV } from "./agents/events"
 import { delay } from "./agents/kit"
 import { emitPrice, feedQueue } from "./agents/priceFeed"
-import { startSwarm } from "./swarm"
+import { TRUST_THRESHOLD } from "./rules/verdict"
+import { observeVerdicts, startSwarm } from "./swarm"
+import type { VerdictUpdated } from "./agents/events"
 
 // `npm run check` runs the swarm headless, prints a summary and self-checks;
 // `npm run check -- --log` also prints every event.
 
 const state = startSwarm(2611)
+const updates: VerdictUpdated[] = []
+observeVerdicts((u) => updates.push(u), state)
 
 for (const o of feedQueue()) {
 	emitPrice(o)
@@ -35,12 +39,14 @@ for (const e of log) {
 const count = (pred: (e: (typeof log)[number]) => boolean) => log.filter(pred).length
 const cascades = log.filter((e) => e.kind === "end" && e.event === EV.shopTrustChanged && !/ 0 flipped/.test(e.detail ?? ""))
 const finals = [...verdicts.values()]
+const onHold = updates.filter((u) => u.cause === EV.shopTrustChanged && u.previous === "REAL DEAL" && u.verdict === "WAIT")
 const byVerdict = Object.entries(Object.groupBy(finals, (v) => v.verdict)).map(([k, v]) => `${k} ${v!.length}`)
 
 console.log(`events emitted: ${count((e) => e.kind === "emit")}, peak ${peak} handlers in flight, errors ${count((e) => e.kind === "error")}`)
 console.log(`verdict flips: ${count((e) => e.kind === "emit" && e.event === EV.verdictUpdated)}`)
 console.log(`final verdicts: ${byVerdict.join(", ")}`)
 console.log(`trust: ${data.shops.map((s) => `${s.name} ${trust.get(s.id)}`).join(", ")}`)
+console.log(`REAL DEAL put on hold by a cascade: ${onHold.length} (${[...new Set(onHold.map((u) => u.shopId))].join(", ")})`)
 console.log(`cascades that flipped verdicts: ${cascades.length}${cascades[0] ? `, e.g. "${cascades[0].detail}"` : ""}`)
 
 const fakePlanted = finals.filter((v) => {
@@ -53,6 +59,8 @@ const checks: Array<[string, boolean]> = [
 	["no offer left CHECKING", finals.every((v) => v.verdict !== "CHECKING")],
 	["every planted fake ends FAKE DISCOUNT", fakePlanted.every((v) => v.verdict === "FAKE DISCOUNT")],
 	["a trust drop flipped other verdicts", cascades.length > 0],
+	["a caught shop's REAL DEAL was put on hold by the cascade", onHold.length > 0],
+	["at most one shop ends under the trust threshold", data.shops.filter((s) => trust.get(s.id)! < TRUST_THRESHOLD).length <= 1],
 	["at least one BUY ON KP INSTEAD", finals.some((v) => v.verdict === "BUY ON KP INSTEAD")],
 	["at least one REAL DEAL", finals.some((v) => v.verdict === "REAL DEAL")],
 ]

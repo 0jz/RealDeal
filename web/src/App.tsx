@@ -112,7 +112,7 @@ export function App() {
 								)
 							})}
 						</ul>
-						<p className="note">Each fake discount costs a shop 10 points. Under {TRUST_THRESHOLD}, its other deals are put on hold.</p>
+						<p className="note">A fake discount costs a shop 10 points, a discount that checks out wins back 3. Under {TRUST_THRESHOLD}, its other deals are put on hold.</p>
 					</section>
 
 					<section aria-label="Latest verdict changes">

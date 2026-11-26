@@ -26,7 +26,7 @@ npm run typecheck
 Every agent is a Mozaik participant on one shared runtime. `publish()` hands each event to every participant's matching handler **without awaiting it**, so each agent's async handler runs on its own: when `price.changed` arrives, ThirtyDayAgent and KPMarketAgent both start on it at the same moment, and KP lookups from earlier events are still in flight while new prices arrive. There is no central scheduler. Agents publish their findings (`discount.fake`, `kp.price`, `crossshop.best`, …) as new events that other agents can react to:
 
 - **VerdictAgent never waits for all results.** Each finding updates one field of the offer's record and the verdict is recomputed at once, so it can go CHECKING → REAL DEAL → BUY ON KP INSTEAD as agents report in.
-- **Cascade:** ThirtyDayAgent emits `discount.fake` → ShopTrustAgent lowers that shop's trust and emits `shop.trust.changed` → VerdictAgent re-scores every product from that shop. Every emit/start/end is logged with a timestamp and agent name ([src/runtime.ts](src/runtime.ts), [src/agents/kit.ts](src/agents/kit.ts)).
+- **Cascade:** ThirtyDayAgent emits `discount.fake` → ShopTrustAgent lowers that shop's trust and emits `shop.trust.changed` → VerdictAgent re-scores every product from that shop. A fake costs 10 trust points and a discount that checks out wins back 3, so the score follows how often a shop fakes rather than how much it sells. The feed is scripted for the demo: DigiMax's honest deals land first, then its fakes, and once its trust falls under 60 its earlier REAL DEALs flip to WAIT on screen. Every emit/start/end is logged with a timestamp and agent name ([src/runtime.ts](src/runtime.ts), [src/agents/kit.ts](src/agents/kit.ts)).
 
 ## Status
 
