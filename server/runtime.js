@@ -32,6 +32,13 @@ const itemOf = (event) => runOf(event)?.items.get(event.payload?.productId);
 export class FirstSnapshotOfProduct extends SituationSpecification {
   isSatisfiedBy({ event }) { const item = itemOf(event); return !!item && item.kp.status === "idle"; }
 }
+/** Product-scan runs (mobile scanner) vs shopping-list runs. */
+export class ScanRun extends SituationSpecification {
+  isSatisfiedBy({ event }) { return runOf(event)?.kind === "scan"; }
+}
+export class FirstScoutOfProduct extends SituationSpecification {
+  isSatisfiedBy({ event }) { const item = itemOf(event); return !!item && item.scout?.status === "idle"; }
+}
 /** ShopTrust audits each retailer once per run. */
 export class HasUnauditedRetailer extends SituationSpecification {
   isSatisfiedBy({ event }) { const run = runOf(event); return !!run && (event.payload.offers || []).some((o) => !run.trust.has(o.retailerId)); }

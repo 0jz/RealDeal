@@ -1,5 +1,6 @@
 // One Node.js process: REST API + Server-Sent Events + the static frontend. No build step.
 import { createServer } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
 import { readFile } from "node:fs/promises";
 import { join, extname, normalize } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
@@ -25,15 +26,22 @@ const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; ch
 const json = (res, code, body) => { res.writeHead(code, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }); res.end(JSON.stringify(body)); };
 const readBody = (req) => new Promise((resolve) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => { try { resolve(b ? JSON.parse(b) : {}); } catch { resolve({}); } }); });
 
-const server = createServer(async (req, res) => {
+const handler = async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   const path = url.pathname;
   try {
     if (path === "/api/health") return json(res, 200, { ok: true, mode: app.cfg.mode });
     if (path === "/api/meta") return json(res, 200, app.meta());
+    if (path === "/api/summary") return json(res, 200, app.summary());
+    if (path === "/api/products") return json(res, 200, app.findProducts(url.searchParams.get("q")));
+    if (path === "/api/scans" && req.method === "POST") {
+      const body = await readBody(req); const r = app.startScan(body.code || body.q);
+      return r ? json(res, 201, { runId: r.run.id, product: r.product }) : json(res, 404, { error: "no product in the synthetic dataset matches that code or name" });
+    }
     if (path === "/api/runs" && req.method === "POST") { const body = await readBody(req); const run = app.startRun(body.listId); return json(res, 201, { runId: run.id }); }
     let m;
     if ((m = /^\/api\/runs\/([\w-]+)$/.exec(path))) { const s = app.snapshot(m[1]); return s ? json(res, 200, s) : json(res, 404, { error: "run not found" }); }
+    if ((m = /^\/api\/scans\/([\w-]+)$/.exec(path))) { const r = app.scanResult(m[1]); return r ? json(res, 200, r) : json(res, 404, { error: "scan not found" }); }
     if ((m = /^\/api\/runs\/([\w-]+)\/next-page$/.exec(path)) && req.method === "POST") return json(res, app.nextPage(m[1]) ? 202 : 404, {});
     if ((m = /^\/api\/runs\/([\w-]+)\/stream$/.exec(path))) {
       const snap = app.snapshot(m[1]); if (!snap) return json(res, 404, { error: "run not found" });
@@ -55,14 +63,18 @@ const server = createServer(async (req, res) => {
     if (e.code === "ENOENT") return json(res, 404, { error: "not found" });
     console.error(e); json(res, 500, { error: "internal error" });
   }
-});
+};
+// Phones only allow camera access on https:// (or localhost). Set HTTPS_KEY and HTTPS_CERT to serve TLS directly,
+// or put the app behind Caddy / a tunnel that terminates TLS.
+const tls = process.env.HTTPS_KEY && process.env.HTTPS_CERT ? { key: readFileSync(process.env.HTTPS_KEY), cert: readFileSync(process.env.HTTPS_CERT) } : null;
+const server = tls ? createHttpsServer(tls, handler) : createServer(handler);
 
 process.on("unhandledRejection", (e) => console.error("[unhandledRejection]", e));
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
 server.listen(PORT, HOST, () => {
   const c = app.cfg;
-  console.log(`Black Friday Check running on http://localhost:${PORT}`);
+  console.log(`Black Friday Check running on ${tls ? "https" : "http"}://localhost:${PORT}`);
   console.log(c.mode === "llm" ? `LLM mode: ${c.model} via ${c.provider}` : `NO-KEY TEMPLATE MODE (${c.reason}). Set OPENAI_API_KEY (see .env.example) for real LLM agents.`);
 });
 const shutdown = () => { server.close(); app.close().finally(() => process.exit(0)); };

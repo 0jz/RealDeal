@@ -253,3 +253,56 @@ export function numberGuard(text, allowed) {
   }
   return { ok: bad.length === 0, bad };
 }
+
+/** PriceScout: Serbian average (synthetic retailers) vs synthetic world reference prices, and the cheapest offer. */
+export function priceScout(history, productId, offers, world, fx, bfDate) {
+  const mean = (xs) => Math.round(xs.reduce((a, b) => a + b, 0) / (xs.length || 1));
+  const from = addDays(bfDate, -30);
+  const cur = offers.map((o) => ({ retailerId: o.retailerId, offerId: o.id, price: o.bfPrice }));
+  const hist = offers.flatMap((o) => (history[`${o.retailerId}:${productId}`] || []).filter((r) => r.d >= from && r.d < bfDate).map((r) => ({ ...r, retailerId: o.retailerId })));
+  const cheapest = cur.reduce((m, r) => (r.price < m.price ? r : m), cur[0]);
+  const avgNow = mean(cur.map((r) => r.price));
+  const wrows = world.filter((w) => w.productId === productId).map((w) => {
+    const rate = fx.rates[w.currency];
+    return { ...w, rate, rsd: N(Math.round(w.price * rate), [`world:${w.id}`, `fx:${w.currency}`], `${w.price} ${w.currency} × ${rate} RSD/${w.currency} (approximate fixed rate)`) };
+  });
+  const worldAvg = wrows.length ? mean(wrows.map((w) => w.rsd.v)) : null;
+  return {
+    productId,
+    serbia: {
+      shops: cur.length,
+      avgNow: N(avgNow, cur.map((r) => offerRef(r.offerId)), `mean of the current offers at ${cur.length} Serbian retailers (fictional, synthetic feed)`),
+      avg30: N(mean(hist.map((r) => r.p)), [...new Set(hist.map((r) => histRef(r.retailerId, productId)))], `mean of ${hist.length} daily prices ${from}…${addDays(bfDate, -1)} across those retailers`),
+      rows: cur,
+    },
+    world: worldAvg === null ? null : {
+      markets: wrows.length,
+      avg: N(worldAvg, wrows.map((w) => `world:${w.id}`).concat([...new Set(wrows.map((w) => `fx:${w.currency}`))]), `mean of ${wrows.length} synthetic world reference prices converted to RSD with approximate fixed rates`),
+      rows: wrows.map(({ id, market, country, currency, price, rate, rsd }) => ({ id, market, country, currency, price, rate, rsd })),
+    },
+    cheapest: { retailerId: cheapest.retailerId, offerId: cheapest.offerId, price: N(cheapest.price, offerRef(cheapest.offerId), "lowest current offer in the feed") },
+    serbiaVsWorld: worldAvg === null ? null : N(avgNow - worldAvg, cur.map((r) => offerRef(r.offerId)).concat(wrows.map((w) => `world:${w.id}`)), "Serbian average − world average (positive = Serbia is more expensive)"),
+  };
+}
+
+/** Timeline statistics for a run, from its task records (the same numbers the timeline draws). */
+export function runStats(tasks, startedAt, completedAt) {
+  const asyncT = tasks.filter((t) => t.kind !== "sync");
+  const ev = asyncT.flatMap((t) => [[t.start, 1], [t.end ?? Infinity, -1]]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  let c = 0, peak = 0; for (const [, d] of ev) { c += d; peak = Math.max(peak, c); }
+  const workers = tasks.flatMap((t) => t.steps.filter((s) => s.kind === "worker" && s.end));
+  const wev = workers.flatMap((s) => [[s.start, 1], [s.end, -1]]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  let wc = 0, wpeak = 0; for (const [, d] of wev) { wc += d; wpeak = Math.max(wpeak, wc); }
+  const byAgent = {};
+  for (const t of tasks) byAgent[t.agent] = (byAgent[t.agent] || 0) + 1;
+  return {
+    tasks: tasks.length, asyncTasks: asyncT.length, peakConcurrency: peak, workerJobs: workers.length, peakParallelWorkers: wpeak,
+    loops: tasks.filter((t) => t.kind === "loop").length,
+    inferenceSteps: tasks.reduce((a, t) => a + t.steps.filter((s) => s.kind === "inference").length, 0),
+    superseded: tasks.filter((t) => t.status === "superseded").length,
+    interceptions: tasks.filter((t) => t.interception).length,
+    rewrites: tasks.filter((t) => t.interception?.changed).length,
+    agentsActive: Object.keys(byAgent).length, byAgent,
+    runMs: completedAt ? Math.round(completedAt - startedAt) : null,
+  };
+}

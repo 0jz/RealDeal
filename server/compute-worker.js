@@ -3,7 +3,7 @@
 import { parentPort, workerData, threadId } from "node:worker_threads";
 import { performance } from "node:perf_hooks";
 import { loadDataset } from "./data.js";
-import { crossShopCompare, trustAudit } from "./rules.js";
+import { crossShopCompare, trustAudit, priceScout } from "./rules.js";
 
 const now = () => performance.timeOrigin + performance.now();
 const ds = loadDataset();
@@ -32,6 +32,7 @@ const handlers = {
   kpSearch,
   crossShop: ({ productId, offers }) => crossShopCompare(ds.history, productId, offers, ds.meta.bfDate),
   trustAudit: ({ retailerId }) => trustAudit(ds.history, retailerId, ds.pages[0], ds.meta.bfDate),
+  priceScout: ({ productId, offers }) => priceScout(ds.history, productId, offers, ds.world, ds.fx, ds.meta.bfDate),
 };
 
 parentPort.on("message", ({ id, type, args }) => {

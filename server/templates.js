@@ -23,7 +23,12 @@ export function templateKpSelect(product, candidates) {
   return { matches, rejected };
 }
 
+export const scoutTemplate = (o) => o?.serbia
+  ? `Average across ${o.serbia.shops} Serbian shops: ${fmtRSD(o.serbia.avgNow.v)}${o.world ? `; synthetic world reference average: ${fmtRSD(o.world.avg.v)} (${o.world.markets} markets)` : ""}. Cheapest offer: ${o.cheapestName} at ${fmtRSD(o.cheapest.price.v)}.`
+  : "Price reference unavailable.";
+
 export const templates = {
+  price_reference: (out) => scoutTemplate(out),
   search_kp_listings(out) {
     if (!out?.candidates) return JSON.stringify({ matches: [], rejected: [], note: "tool error" });
     return JSON.stringify(templateKpSelect(out.product || out.query, out.candidates));

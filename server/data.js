@@ -20,8 +20,12 @@ export function loadDataset() {
   const kp = read("kp-listings.json");
   const pages = [1, 2, 3].map((n) => read(`feed/page-${n}.json`));
   const offersById = new Map(pages.flat().map((o) => [o.id, o]));
+  const world = existsSync(join(DATA_DIR, "world-prices.json")) ? read("world-prices.json") : [];
+  const fx = existsSync(join(DATA_DIR, "fx-rates.json")) ? read("fx-rates.json") : { rates: { RSD: 1 } };
   return {
-    meta, retailers, products, history, lists, kp, pages, offersById,
+    meta, retailers, products, history, lists, kp, pages, offersById, world, fx,
+    worldById: new Map(world.map((w) => [w.id, w])),
+    productByEan: new Map(products.filter((p) => p.ean13).map((p) => [p.ean13, p])),
     retailerById: new Map(retailers.map((r) => [r.id, r])),
     productById: new Map(products.map((p) => [p.id, p])),
     kpById: new Map(kp.map((l) => [l.id, l])),
