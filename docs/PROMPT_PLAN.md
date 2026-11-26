@@ -20,12 +20,12 @@ Target UX: **one text box, one budget field, one button, and then the plan.** Th
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│ What do you want to buy or sell?                         │
+│              What do you want to buy or sell?            │
 │ ┌──────────────────────────────────────────────────────┐ │
-│ │ New phone and good earbuds. I can sell my iPhone 13, │ │
-│ │ it's in good shape.                                  │ │
+│ │ New phone for 75000 RSD. I can sell my iPhone 13, it │ │
+│ │                 's in good shape.                    │ │
 │ └──────────────────────────────────────────────────────┘ │
-│ Budget (RSD) [ 75000 ]                [ Make my plan ]   │
+│                     [ Make my plan ]                     │
 └──────────────────────────────────────────────────────────┘
 
 Sell first, then buy.                     Left after: 7.600
@@ -34,7 +34,7 @@ Sell first, then buy.                     Left after: 7.600
  BUY   AirPods Pro 2        −25.400  your price
 
 What I understood                                [Edit details]
- [phone → iPhone 14 ▾] [earbuds → AirPods Pro 2 ▾] [sell: iPhone 13, good ▾]
+ [phone → iPhone 14 ▾] [sell: iPhone 13, good ▾]
 ```
 
 - **First screen:** only the prompt, the budget and a button. Three example prompts sit under the box as clickable chips.
