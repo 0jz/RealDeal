@@ -57,7 +57,7 @@ try {
   await cp(join(ROOT, "public"), OUT, { recursive: true });
   await writeFile(join(OUT, ".nojekyll"), "");
   let commit = "unknown";
-  try { commit = execSync("git rev-parse --short HEAD", { cwd: ROOT, stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch {}
+  try { commit = execSync(`git -c safe.directory=${ROOT.replace(/\\/g, "/")} rev-parse --short HEAD`, { cwd: ROOT, stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch {}
   const repo = process.env.GITHUB_REPOSITORY ? `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${process.env.GITHUB_REPOSITORY}` : process.env.PAGES_REPO_URL || "";
   for (const f of (await readdir(OUT)).filter((f) => f.endsWith(".html"))) {
     const html = await readFile(join(OUT, f), "utf8");
