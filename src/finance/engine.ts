@@ -154,7 +154,8 @@ function launch(s: Session, role: Role) {
 	if (role === "StrategyAgent" && s.strategyRunning) { s.strategyQueued = true; return }
 	if (role === "StrategyAgent") s.strategyRunning = true
 	const context = ModelContext.create()
-	const run: AgentRun = { id: ++nextRun, agent: role, revision: s.view.revision, cycle: s.cycle, startedAt: new Date().toISOString(), startMs: performance.now(), status: "running", mode: financeMode() }
+	const now = performance.now()
+	const run: AgentRun = { id: ++nextRun, agent: role, revision: s.view.revision, cycle: s.cycle, startedAt: new Date().toISOString(), queuedMs: now, startMs: now, status: "running", mode: financeMode() }
 	const job: Job = { id: run.id, session: s, role, epoch: s.epoch, revision: s.view.revision, snapshot: snapshot(s), run }
 	jobs.set(context.id, job)
 	s.view.runs.push(run)

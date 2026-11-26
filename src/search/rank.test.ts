@@ -8,6 +8,7 @@ function row(over: Partial<ResultRow>): ResultRow {
 		key: `kp|${Math.random()}`,
 		source: "kp",
 		sourceName: "KupujemProdajem",
+		image: null,
 		kind: "classified",
 		title: "x",
 		url: "https://example.test",

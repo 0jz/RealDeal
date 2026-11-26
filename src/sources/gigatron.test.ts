@@ -34,6 +34,13 @@ test("parses name, price and stock from Product JSON-LD", () => {
 	assert.equal(l?.shopId, "gigatron")
 })
 
+test("takes the first https image of the JSON-LD Product", () => {
+	const withImage = (image: unknown) =>
+		`<html><script type="application/ld+json">${JSON.stringify({ "@type": "Product", name: "Apple iPhone 15 Pro 128GB", productID: "42", image, offers: { price: 129999, availability: "https://schema.org/InStock" } })}</script></html>`
+	assert.equal(parseProduct(withImage(["https://example.com/a.jpg"]), url)?.image, "https://example.com/a.jpg")
+	assert.equal(parseProduct(withImage("http://insecure/a.jpg"), url)?.image, null)
+})
+
 test("skips out-of-stock and unpriced products", () => {
 	assert.equal(parseProduct(page({ price: 129999, availability: "https://schema.org/OutOfStock" }), url), null)
 	assert.equal(parseProduct(page({ price: 0 }), url), null)

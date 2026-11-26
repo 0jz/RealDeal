@@ -94,6 +94,8 @@ export type ResultRow = {
 	key: string // `${source}|${id}`
 	source: string
 	sourceName: string
+	/** Product picture URL (https only) when the source gives one. */
+	image?: string | null
 	kind: SourceKind
 	title: string
 	url: string

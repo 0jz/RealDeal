@@ -43,6 +43,8 @@ export type RawListing = {
 	/** Shop listings only: last 60 daily prices (index 59 = yesterday, null = not in stock) and the advertised previous price, for the 30-day rule. */
 	history?: (number | null)[] | null
 	shownPrevPrice?: number | null
+	/** Product picture URL (https only) when the source gives one. */
+	image?: string | null
 }
 
 export type MatchMethod = "rule" | "fuzzy" | "llm" | "none"
@@ -104,6 +106,8 @@ export type ResultRow = {
 	condition: Condition | null
 	city: string | null
 	shopName: string | null
+	/** Product picture URL (https only), null when the source gives none. */
+	image: string | null
 	storageGb: number | null
 	productId: string
 	confidence: number
