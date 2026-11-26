@@ -29,12 +29,13 @@ Checked November 26, 2026 (step 0 of `docs/SCOUTS_PROMPT.md`), with the same hon
   - The database is protected under the Serbian copyright and related rights law. Only insignificant parts may be used.
 - **Decision:** the Cenoteka scout stays off. A scripted reader breaks the terms however politely it fetches. It could only be turned on with written permission from Cenoteka d.o.o. (for example, a data or partner agreement).
 
-## eponuda (eponuda.rs): not reachable
+## eponuda: moved to eponuda.com, blocked for automated clients
 
-- **robots.txt** (Cloudflare-managed) allows `/` for all agents. It sets `Content-Signal: search=yes, ai-train=no, use=reference` and does not mention `ai-input`. It blocks named AI crawlers (GPTBot, ClaudeBot, CCBot and others). Sending listing titles to an LLM to judge them is `ai-input`, which the signal neither grants nor restricts.
-- **Not reachable.** Every page, including the home page, returned **HTTP 522** (Cloudflare could not reach eponuda's server), both with our User-Agent and in a normal browser. `eponuda.com` returns a Cloudflare challenge page (403).
-- **Terms of use:** not read, because the site is down.
-- **Decision:** the eponuda scout is off until the site answers. Then read its terms and fetch one search page and one product page again before building the parser.
+- **The site moved.** `www.eponuda.rs` returns HTTP 522 (Cloudflare can't reach the old server). `eponuda.rs` redirects to **`www.eponuda.com`**, which works in a normal browser. It has a clothing and shoes section ("Odeća i Obuća") as well as electronics.
+- **robots.txt** (`www.eponuda.com/robots.txt`, read in a browser) allows `/` for all agents. It disallows `/link?` and `/link/` (the outgoing shop links), `/ajax/`, `/axios/`, `/compare-product`, `/uporedicene`, `/r?`, and URLs with `brand`, `sortBy=`, `attr_*`, `minPrice=` or `maxPrice=` parameters. So price-range filtering has to happen on our side, not through eponuda's URL filters.
+- **Our fetcher gets a challenge, not the page.** Every request with `politeFetch`'s User-Agent, robots.txt included, returns `403` with `cf-mitigated: challenge`. Only a browser that runs Cloudflare's JavaScript challenge gets through. Getting a script past that check is bot-detection bypass, which the hard rules forbid. A plain-HTTP scout cannot read eponuda.com.
+- **Terms of use** (`/uslovi`) are served as a file download, not a page, and were not read.
+- **Decision:** the eponuda scout stays off. Ways to turn it on legitimately: eponuda allowlists our bot (for example as a Cloudflare verified bot), or gives us a partner feed or API. "Registracija prodavnice" on the site suggests they have a shop/partner programme to ask through. Read the `/uslovi` file before any of that.
 
 ## Result
 
