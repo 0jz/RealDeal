@@ -8,7 +8,7 @@ import { rsd } from "./Finance"
 export function SiteNav({ links = false, action }: { links?: boolean; action?: ReactNode }) {
 	return <header className="site-nav">
 		<a className="site-brand" href="/"><span className="site-logo" aria-hidden="true">R</span><span>RealDeal</span></a>
-		{links && <nav aria-label="Sections"><a href="#how">How it works</a><a href="#plan">Make a plan</a></nav>}
+		{links && <nav aria-label="Sections"><a href="#how">How it works</a><a href="/new">Make a plan</a></nav>}
 		{action && <div className="site-nav-action">{action}</div>}
 	</header>
 }
@@ -34,8 +34,8 @@ function exampleTiles(g: Goal) {
 	]
 }
 
-/** The front page. `children` is the prompt box, shown in the "Make a plan" section. */
-export function Landing({ children }: { children: ReactNode }) {
+/** The front page. "Make my plan" opens the prompt page at /new. */
+export function Landing() {
 	const [example, setExample] = useState<Goal | null>(null)
 	useEffect(() => {
 		const ctl = new AbortController()
@@ -52,13 +52,13 @@ export function Landing({ children }: { children: ReactNode }) {
 				<p className="site-eyebrow">Buy · sell · stay within budget</p>
 				<h1>Can you <em>afford</em> it?</h1>
 				<p className="site-lead">Say what you want to buy and what you could sell. Five agents check your offers, value your old things, flag risky deals and build <b>one plan that never spends money you don't have yet</b>: what to buy now, what to sell first and what to wait on.</p>
-				<div className="site-cta"><a className="site-btn primary" href="#plan">Make my plan</a><a className="site-btn" href="#how">How it works</a></div>
+				<div className="site-cta"><a className="site-btn primary" href="/new">Make my plan</a><a className="site-btn" href="#how">How it works</a></div>
 				{example && <>
 					<div className="site-stats">{exampleTiles(example).map(t => <div key={t.label} className="site-stat">
 						<div className={t.tone === "green" ? "site-stat-v green" : "site-stat-v"}>{t.value}{t.unit && <span> {t.unit}</span>}</div>
 						<div className="site-stat-l">{t.label}</div>
 					</div>)}</div>
-					<p className="site-hero-foot">Example plan “{example.title}”, read from the server. Type your own below and the agents check it live.</p>
+					<p className="site-hero-foot">Example plan “{example.title}”, read from the server. Make your own plan and the agents check it live.</p>
 				</>}
 			</div>
 		</section>
@@ -72,8 +72,6 @@ export function Landing({ children }: { children: ReactNode }) {
 					<p>{a.text}</p>
 				</article>)}</div>
 			</section>
-
-			<section id="plan" className="site-section site-plan">{children}</section>
 		</main>
 
 		<footer className="site-footer site-wrap">

@@ -8,6 +8,8 @@ import { blankDraft, CommandError, followPlan, FinanceForm, planIdFromUrl, PlanR
 const MAX_CHARS = 1000
 const WARN_CHARS = 800
 const MAX_RSD = 10_000_000
+/** The prompt page. The server and Vite both serve index.html for it. */
+export const ASK_PATH = "/new"
 const EXAMPLES = [
 	"New phone for 75000 RSD. I can sell my iPhone 13, it's in good shape.",
 	"Hoću iPhone 15 za 85k, prodajem stari ajfon 13",
@@ -115,6 +117,7 @@ export function Planner() {
 
 	function newPlan() {
 		generation.current++; stream.current?.close()
+		history.replaceState(null, "", ASK_PATH)
 		setView(null); setKept(null); setPhase("idle"); setDraft(blankDraft()); setEditing(false); setText(""); setError(""); setMiss(null); setSaleAmounts({}); setBusy(false); setPlanInUrl(null)
 	}
 
@@ -126,9 +129,13 @@ export function Planner() {
 
 	const checking = phase === "checking"
 
-	if (!view || checking) return <Landing>
-		<div className="ask" aria-labelledby="ask-title">
-			<h2 id="ask-title">What do you want to buy or sell?</h2>
+	// The front page is "/". The prompt page with the test prompts is ASK_PATH; a broken plan link also lands there to show its error.
+	if (!view && location.pathname !== ASK_PATH && !error) return <Landing />
+
+	if (!view || checking) return <main className="page ask-page">
+		<section className="ask" aria-labelledby="ask-title">
+			<p className="brand"><a href="/">RealDeal</a></p>
+			<h1 id="ask-title">What do you want to buy or sell?</h1>
 			<div className="ask-box">
 				<label className="field"><span className="sr-only">Describe what you want to buy or sell</span>
 					<textarea value={text} maxLength={MAX_CHARS} rows={1} placeholder="e.g. New phone for 75000 RSD. I can sell my old iPhone 13." aria-describedby="ask-count" onChange={e => setText(e.target.value)} onKeyDown={onPromptKey} readOnly={checking} />
@@ -145,8 +152,8 @@ export function Planner() {
 				<p className="label">Or try one of these</p>
 				<ul>{EXAMPLES.map(ex => <li key={ex}><button type="button" onClick={() => setText(ex)}>{ex}</button></li>)}</ul>
 			</div>}
-		</div>
-	</Landing>
+		</section>
+	</main>
 
 	const alternativesFor = (wish: Wish) => (kept?.alternatives[wish.id] ?? [])
 		.map(id => catalogue.find(p => p.id === id))
