@@ -71,12 +71,14 @@ function openStream(id: string, req: IncomingMessage, res: ServerResponse) {
 	})
 }
 
+const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
 async function api(req: IncomingMessage, res: ServerResponse, path: string): Promise<void> {
 	if (req.method === "GET" && path === "/api/health") return json(res, 200, { ok: true, transactions: "simulated" })
 	if (req.method === "GET" && path === "/api/goal/demo") return json(res, 200, DEMO_GOAL)
 	if (req.method === "POST" && path === "/api/goal") {
 		try { return json(res, 201, createGoal(await readBody(req))) }
-		catch (error) { return json(res, 400, { error: String(error) }) }
+		catch (error) { return json(res, 400, { error: errorText(error) }) }
 	}
 	const goalRoute = /^\/api\/goal\/([\w-]+)(?:\/(stream|command))?$/.exec(path)
 	if (goalRoute) {
@@ -93,7 +95,7 @@ async function api(req: IncomingMessage, res: ServerResponse, path: string): Pro
 		}
 		if (req.method === "POST" && goalRoute[2] === "command") {
 			try { return json(res, 200, commandGoal(id, await readBody(req) as CommandRequest)) }
-			catch (error) { return json(res, 409, { error: String(error), view: getGoal(id) }) }
+			catch (error) { return json(res, 409, { error: errorText(error), view: getGoal(id) }) }
 		}
 	}
 	if (req.method === "POST" && path === "/api/search") {

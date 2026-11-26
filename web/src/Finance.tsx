@@ -58,7 +58,7 @@ export function Finance() {
 			es.addEventListener("view", event => { if (gen === generation.current) accept(JSON.parse((event as MessageEvent).data)) })
 			es.onerror = () => { if (gen === generation.current) setError("Live connection interrupted; reconnecting. Current plan is retained.") }
 			es.onopen = () => { if (gen === generation.current) setError("") }
-		} catch (e) { if (gen === generation.current) setError(String(e)) }
+		} catch (e) { if (gen === generation.current) setError(e instanceof Error ? e.message : String(e)) }
 		finally { if (gen === generation.current) setBusy(false) }
 	}
 	async function command(command: Command) {
@@ -71,7 +71,7 @@ export function Finance() {
 			if (gen !== generation.current) return
 			if (!response.ok) { if (data.view) accept(data.view); throw new Error(data.error) }
 			accept(data)
-		} catch (e) { if (gen === generation.current) setError(String(e)) }
+		} catch (e) { if (gen === generation.current) setError(e instanceof Error ? e.message : String(e)) }
 		finally { if (gen === generation.current) setBusy(false) }
 	}
 	const patchGoal = (patch: Partial<Goal>) => setGoal(g => g ? { ...g, ...patch } : g)
