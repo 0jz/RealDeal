@@ -1,0 +1,21 @@
+{
+	"name": "realdeal",
+	"version": "0.1.0",
+	"description": "Buyer-side agent swarm that catches fake Black Friday discounts (Serbia's 30-day rule). Team JDI, built on Mozaik.",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"dev": "tsx src/main.ts",
+		"data": "tsx src/data/cli.ts",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@mozaik-ai/core": "6.0.0",
+		"dotenv": "^17.4.2"
+	},
+	"devDependencies": {
+		"@types/node": "^24.0.0",
+		"tsx": "^4.23.13",
+		"typescript": "^7.0.2"
+	}
+}
