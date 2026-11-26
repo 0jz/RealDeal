@@ -1,10 +1,10 @@
 import assert from "node:assert/strict"
 import { randomUUID } from "node:crypto"
-import { mkdtempSync, readdirSync } from "node:fs"
+import { mkdtempSync, readdirSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
-import { commandGoal, createGoal, EXAMPLE_GOAL, getGoal, subscribeGoal } from "./engine"
+import { commandGoal, createGoal, createGoalFromPrompt, EXAMPLE_GOAL, getGoal, PromptError, subscribeGoal } from "./engine"
 import type { Command, FinanceView } from "./types"
 
 process.env.REALDEAL_LLM = "0"
@@ -69,6 +69,27 @@ test("plans are saved to disk and bad IDs are rejected", async () => {
 	assert.ok(readdirSync(process.env.REALDEAL_SESSIONS!).includes(`${v.id}.json`))
 	assert.equal(getGoal("00000000-0000-0000-0000-000000000000"), null)
 	assert.equal(getGoal("../../etc/passwd"), null)
+})
+test("a prompt becomes a stored plan with its intent, and update-goal keeps the intent", async () => {
+	const created = await createGoalFromPrompt({ prompt: "Hoću iPhone 15 za 85k, prodajem stari ajfon 13", budget: 100000 })
+	const v = await settled(created.id)
+	assert.match(v.goal.wishes[0].name, /iPhone 15/)
+	assert.equal(v.goal.wishes[0].price, 85000)
+	assert.ok(v.intent)
+	assert.ok(v.alternatives)
+	assert.ok(JSON.parse(readFileSync(join(process.env.REALDEAL_SESSIONS!, `${v.id}.json`), "utf8")).intent)
+	const updated = await settled(act(v, { type: "update-goal", goal: { ...v.goal, cash: 110000 } }).id)
+	assert.deepEqual(updated.intent, v.intent)
+	assert.deepEqual(getGoal(v.id)?.intent, v.intent)
+})
+test("a prompt with nothing to buy is rejected with the unknown text", async () => {
+	await assert.rejects(createGoalFromPrompt({ prompt: "asdf qwerty", budget: 50000 }), (e: unknown) => e instanceof PromptError && e.unknown.length > 0)
+})
+test("a prompt without an amount asks how much can be spent", async () => {
+	await assert.rejects(createGoalFromPrompt({ prompt: "new phone" }), (e: unknown) => e instanceof PromptError && /How much can you spend/.test(e.message))
+})
+test("an over-long prompt is rejected before parsing", async () => {
+	await assert.rejects(createGoalFromPrompt({ prompt: "a".repeat(1001), budget: 50000 }), /1 to 1000 characters/)
 })
 test("interception rejects actual in-flight obsolete responses without changing submitted requests", { timeout: 5000 }, async () => {
 	const baseline = await settled(createGoal(EXAMPLE_GOAL).id)

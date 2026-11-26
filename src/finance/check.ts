@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto"
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { commandGoal, createGoal, EXAMPLE_GOAL, subscribeGoal } from "./engine"
+import { commandGoal, createGoal, createGoalFromPrompt, EXAMPLE_GOAL, subscribeGoal } from "./engine"
 import type { Command, FinanceView } from "./types"
 
 process.env.REALDEAL_SESSIONS = await mkdtemp(join(tmpdir(), "realdeal-check-"))
@@ -34,6 +34,19 @@ v = command(v, { type: "buy", offerId: "audio" })
 v = await wait(v.id)
 assert.equal(v.plan.availableCash, 3600)
 console.log("PASS recorded sale and purchases leave 3,600 RSD")
+const prompt = "New phone for 75000 RSD. I can sell my iPhone 13, it's in good shape."
+let p = await wait((await createGoalFromPrompt({ prompt })).id)
+const phone = p.goal.wishes[0]
+assert.equal(p.goal.cash, 75000)
+assert.equal(phone.priceSource, "catalogue")
+assert.ok(phone.price <= 75000 && p.plan.complete && p.plan.projectedRemaining >= 0)
+assert.ok(p.intent && p.alternatives?.[phone.id]?.length && !p.alternatives[phone.id].includes("iphone-13"))
+console.log(`PASS prompt "${prompt}" → ${phone.name} at a typical ${phone.price.toLocaleString("sr-RS")} RSD (estimate), ${p.plan.projectedRemaining.toLocaleString("sr-RS")} RSD left`)
+assert.throws(() => command(p, { type: "buy", offerId: phone.id }), /actually paid/)
+p = command(p, { type: "buy", offerId: phone.id, paid: 68000 })
+assert.equal(p.ledger.spent, 68000)
+console.log("PASS buying at an estimated price records what was actually paid, not the estimate")
+await wait(p.id)
 await mkdir("data/out", { recursive: true })
 await writeFile("data/out/finance-evidence.json", JSON.stringify({ view: v }, null, 2))
 console.log("Saved timestamps, revisions and outcomes to data/out/finance-evidence.json")

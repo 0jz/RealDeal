@@ -2,9 +2,9 @@
 
 **Given what I own, what I want, and my cash, what combination of buying, selling and waiting can I afford?** Team JDI · JigJoy AI Hackathon, November 2026.
 
-You type in what you want to buy (the offers you found: price, delivery, shop, warranty), what you could sell and for how much, and your cash. RealDeal checks each offer for risks, estimates missing sale prices from catalogue prices (clearly labelled as estimates), and builds one plan that never spends money you don't have yet. You then mark what you actually sold, bought or set aside, and the plan updates. Plans are saved, so the link brings you back later.
+You write one sentence: what you want, what you could sell, and how much you can spend ("New phone for 75000 RSD. I can sell my iPhone 13, it's in good shape."). RealDeal picks products from its catalogue that fit, shows what it understood so you can swap a product, type a real price or remove an item, and then checks each offer for risks, estimates missing sale prices from catalogue prices (clearly labelled as estimates), and builds one plan that never spends money you don't have yet. You then mark what you actually sold, bought or set aside, and the plan updates. Plans are saved, so the link brings you back later.
 
-RealDeal does not buy, sell or hold money for you. The older electronics search (sample data) and the Telegram bot remain available under **Price search (sample data)**.
+RealDeal does not buy, sell or hold money for you. Every price is labelled "your price" (written by you) or "typical price (estimate)" (catalogue); no shops, links or delivery costs are invented. The full form is still there under **Edit details**. The older electronics search (sample data) stays available through its API and the Telegram bot; it no longer has a web tab.
 
 ## Run
 
@@ -25,11 +25,11 @@ No credentials are needed. Set `PORT` to change the port. Plans are saved as JSO
 
 ## Walkthrough
 
-1. Open the app and click **Fill with an example**: 75,000 RSD cash, an iPhone 15 offer at 85,000 RSD, AirPods Pro 2 at 25,000 + 400 delivery, and an old iPhone 13 you expect to sell for 40,000 RSD (500 fees, 500 delivery).
-2. **Make my plan**: sell the iPhone 13 (+39,000 net), buy both, 3,600 RSD left. Buying before the sale is refused, because expected sale money isn't cash yet.
-3. Change the sale price to 30,000 and **Update plan**: the AirPods are deferred instead of overspending. Lower the phone offer to 75,000: both fit again.
-4. Clear an offer's delivery price, cut its warranty below the minimum, or enter a price far below the typical price: the offer is blocked with the reason shown.
-5. Under **Track what you did**, mark the sale and purchases. Reload the page or copy the link: the plan and your records come back.
+1. Open the app and click the example **New phone for 75000 RSD. I can sell my iPhone 13, it's in good shape.**, then **Make my plan**. RealDeal picks the best-scoring phone whose typical price fits 75,000 RSD and plans to sell the iPhone 13 at a labelled estimate. Buying before the sale money arrives is refused.
+2. Under **What I understood**, click the phone chip: swap to another phone, type the real price you found (it becomes "your price"), or remove it. The plan updates.
+3. Try **Hoću iPhone 15 za 85k, prodajem stari ajfon 13**: the iPhone 15 is kept at your price of 85,000 RSD. Try **asdf qwerty**: nothing is planned and the unmatched words are shown.
+4. **Edit details** opens the full form: add a shop and delivery, cut a warranty below the minimum, or enter a price far below the typical one, and the offer is blocked with the reason shown.
+5. Under **Track what you did**, mark the sale and purchases. For an estimated price you enter what you actually paid; the ledger records that, never the estimate. Reload the page or copy the link: the plan and your records come back.
 
 ## Financial model
 
@@ -90,7 +90,8 @@ Discount checks are reference-price screening, not a definitive legal verdict. M
 ## API and deployment
 
 - `GET /api/goal/example` — the example goal.
-- `GET /api/products` — catalogue names and typical prices (for hints).
+- `GET /api/products` — catalogue ids, names, categories and typical prices (for hints and swaps).
+- `POST /api/goal/from-prompt` — `{prompt, budget?}`; prompt 1–1,000 characters, budget an integer 0–10,000,000 (otherwise read from the prompt). Interprets the prompt (deterministic parser; with `REALDEAL_LLM=1` an LLM may improve the product mapping but never sets amounts), chooses catalogue products and starts a plan. Returns the view with `intent` and `alternatives`, or 422 `{error, unknown}` when nothing matched or no amount was given. Rate-limited like `POST /api/goal`.
 - `POST /api/goal` — validate a goal and start concurrent analysis (rate-limited, 429).
 - `GET /api/goal/:id` and `/stream` — current snapshot and SSE.
 - `POST /api/goal/:id/command` — `{revision, requestId, command}`. Invalid/stale/unsafe commands return 409 and the latest snapshot. Use the same request ID when retrying the same transaction.

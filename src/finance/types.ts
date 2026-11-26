@@ -1,9 +1,14 @@
+import type { Category } from "../search/types"
+
 /** All amounts are integer RSD. Prices come from the user; nothing is bought or sold by the app. */
+/** Where a price came from: the user ("your price") or the catalogue msrp ("typical price (estimate)"). Missing = "you". */
+export type PriceSource = "you" | "catalogue"
 export type Wish = {
 	id: string; name: string; priority: number
 	/** The offer the user found: price, delivery (null = unknown), shop, optional link. */
 	price: number; delivery: number | null; shop: string; link: string
 	warrantyMonths: number; condition: "new" | "used"
+	priceSource?: PriceSource
 }
 export type Asset = {
 	id: string; name: string; condition: "good" | "fair"
@@ -24,6 +29,7 @@ export type Offer = {
 	shop: string; link: string; warrantyMonths: number; condition: "new" | "used"
 	/** Rough typical new price from the catalogue, when the name matches a known product. */
 	typicalPrice: number | null
+	priceSource?: PriceSource
 	risks: string[]; blocked: boolean
 }
 export type Resale = {
@@ -49,10 +55,31 @@ export type AgentRun = {
 	startMs: number; endMs?: number; status: "running" | "accepted" | "stale" | "error"
 	mode: "offline analysis" | "LLM reasoning"; detail?: string
 }
+/** What a free-text prompt asked for. Structure only: prices are never invented, only read from the prompt. */
+export type IntentWant = {
+	text: string; productId?: string; category?: Category
+	/** "laptop do 100 hiljada": an upper limit, not a price. */
+	maxPrice?: number
+	/** "iPhone 15 za 85k": the price the user wrote next to the item. */
+	price?: number
+	/** 1 = first mentioned = most important. */
+	priority: number
+}
+export type IntentSell = { text: string; productId?: string; condition: "good" | "fair"; expectedPrice?: number }
+export type Intent = {
+	wants: IntentWant[]; sells: IntentSell[]
+	/** Cash available, when the prompt states it ("imam 75k", "budget 75000"). */
+	budget?: number
+	reserve?: number; deadlineDays?: number
+}
 export type FinanceView = {
 	id: string; revision: number; sequence: number; goal: Goal; offers: Offer[]; resale: Resale[]; ledger: Ledger; plan: Plan
 	reason: string; history: { revision: number; reason: string }[]; runs: AgentRun[]
 	notes: Record<string, string>; pending: number; updatedAt: string
+	/** Set when the plan came from a prompt. */
+	intent?: Intent
+	/** Per wish id: other catalogue product ids the user can swap to (same category). */
+	alternatives?: Record<string, string[]>
 }
 export type Command =
 	| { type: "refresh" }
@@ -60,5 +87,6 @@ export type Command =
 	| { type: "confirm-sale"; assetId: string; gross: number }
 	| { type: "reserve"; offerId: string }
 	| { type: "release"; offerId: string }
-	| { type: "buy"; offerId: string }
+	/** `paid` is what was actually paid; required when the offer price is a catalogue estimate. */
+	| { type: "buy"; offerId: string; paid?: number }
 export type CommandRequest = { revision: number; requestId: string; command: Command }

@@ -5,7 +5,7 @@ import { extname, join, normalize } from "node:path"
 import { resolveRuntime, type LogEntry } from "./runtime"
 import { cancel, search, startEngine, subscribe } from "./search/engine"
 import type { Category, SearchMode, SearchRequest } from "./search/types"
-import { commandGoal, createGoal, EXAMPLE_GOAL, getGoal, subscribeGoal } from "./finance/engine"
+import { commandGoal, createGoal, createGoalFromPrompt, EXAMPLE_GOAL, getGoal, PromptError, subscribeGoal } from "./finance/engine"
 import { CATALOGUE } from "./search/catalogue"
 import type { CommandRequest } from "./finance/types"
 
@@ -88,7 +88,7 @@ function allowPlan(ip: string): boolean {
 	if (created.size > 10_000) for (const [k, v] of created) if (v.every((t) => now - t >= 3_600_000)) created.delete(k)
 	return true
 }
-const PRODUCT_LIST = CATALOGUE.map((p) => ({ name: p.model, brand: p.brand, typicalPrice: p.msrp }))
+const PRODUCT_LIST = CATALOGUE.map((p) => ({ id: p.id, name: p.model, brand: p.brand, category: p.category, typicalPrice: p.msrp }))
 
 async function api(req: IncomingMessage, res: ServerResponse, path: string): Promise<void> {
 	if (req.method === "GET" && path === "/api/health") return json(res, 200, { ok: true })
@@ -98,6 +98,14 @@ async function api(req: IncomingMessage, res: ServerResponse, path: string): Pro
 		if (!allowPlan(clientIp(req))) return json(res, 429, { error: "Too many new plans from your address; try again later" })
 		try { return json(res, 201, createGoal(await readBody(req))) }
 		catch (error) { return json(res, 400, { error: errorText(error) }) }
+	}
+	if (req.method === "POST" && path === "/api/goal/from-prompt") {
+		if (!allowPlan(clientIp(req))) return json(res, 429, { error: "Too many new plans from your address; try again later" })
+		try { return json(res, 200, await createGoalFromPrompt(await readBody(req))) }
+		catch (error) {
+			if (error instanceof PromptError) return json(res, 422, { error: error.message, unknown: error.unknown })
+			return json(res, 400, { error: errorText(error) })
+		}
 	}
 	const goalRoute = /^\/api\/goal\/([\w-]+)(?:\/(stream|command))?$/.exec(path)
 	if (goalRoute) {
