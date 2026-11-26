@@ -10,7 +10,7 @@ const newId = (prefix: string) => `${prefix}-${crypto.randomUUID().slice(0, 8)}`
 export type WishDraft = { id: string; name: string; priority: string; price: string; delivery: string; shop: string; link: string; warrantyMonths: string; condition: "new" | "used" }
 export type AssetDraft = { id: string; name: string; condition: "good" | "fair"; expectedPrice: string; fee: string; delivery: string; days: string }
 export type Draft = { title: string; cash: string; reserve: string; deadlineDays: string; minWarrantyMonths: string; wishes: WishDraft[]; assets: AssetDraft[] }
-export type Product = { id: string; name: string; brand: string; typicalPrice: number }
+export type Product = { id: string; name: string; brand: string; category: string; typicalPrice: number }
 
 const blankWish = (priority: number): WishDraft => ({ id: newId("w"), name: "", priority: String(priority), price: "", delivery: "0", shop: "", link: "", warrantyMonths: "24", condition: "new" })
 const blankAsset = (): AssetDraft => ({ id: newId("a"), name: "", condition: "good", expectedPrice: "", fee: "0", delivery: "0", days: "7" })

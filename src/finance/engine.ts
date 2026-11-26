@@ -3,7 +3,10 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { randomUUID } from "node:crypto"
 import { EventTypeIs } from "../agents/kit"
-import { applyRisks, buildOffers, cashBalance, checkRisks, eligible, emptyLedger, estimateResale, optimize, reserved, total, transact, validateGoal, type RiskCheck } from "./model"
+import { applyRisks, buildOffers, cashBalance, checkRisks, eligible, emptyLedger, estimateResale, money, optimize, reserved, total, transact, validateGoal, type RiskCheck } from "./model"
+import { choose } from "./choose"
+import { interpret } from "./interpret"
+import { MAX_PROMPT } from "./prompt"
 import type { AgentRun, CommandRequest, FinanceView, Goal, Offer, Resale } from "./types"
 
 /** Filled into the form by "Use example"; the user replaces the prices with real ones. */
@@ -215,6 +218,36 @@ export function createGoal(input: unknown): FinanceView {
 	const s: Session = { view, epoch: 0, cycle: 0, rawOffers: [], risk: {}, strategyRunning: false, strategyQueued: false, listeners: new Set(), touchedAt: Date.now() }
 	state.sessions.set(view.id, s)
 	for (const role of ROLES) launch(s, role)
+	return snapshot(s)
+}
+/** The prompt was understood as far as it goes, but there is nothing to plan or the budget is missing. Shown to the person as-is. */
+export class PromptError extends Error {
+	unknown: string[]
+	constructor(message: string, unknown: string[]) { super(message); this.name = "PromptError"; this.unknown = unknown }
+}
+
+/** A plan from one free-text prompt: interpret, choose the products, then create the goal like any other plan. */
+export async function createGoalFromPrompt(input: unknown): Promise<FinanceView> {
+	const body = (input && typeof input === "object" ? input : {}) as { prompt?: unknown; budget?: unknown }
+	const prompt = typeof body.prompt === "string" ? body.prompt.trim() : ""
+	if (!prompt || prompt.length > MAX_PROMPT) throw new Error(`Write what you want to buy or sell (1 to ${MAX_PROMPT} characters)`)
+	let budget: number | undefined
+	if (body.budget !== undefined && body.budget !== null) {
+		if (!money(body.budget)) throw new Error("Budget must be a whole number of dinars, from 0 to 10,000,000")
+		budget = body.budget
+	}
+	const { intent: parsed, unknown } = await interpret(prompt)
+	if (!parsed.wants.length) throw new PromptError("I couldn't find anything to buy in that.", unknown.length ? unknown : [prompt])
+	budget ??= parsed.budget
+	if (budget === undefined) throw new PromptError('How much can you spend? Add an amount, like "for 80000 RSD".', [])
+	let chosen: ReturnType<typeof choose>
+	try { chosen = choose(parsed, budget) } catch { throw new PromptError("I couldn't find anything to buy in that.", unknown.length ? unknown : [prompt]) }
+	// The chosen goal goes through createGoal; the intent and swap options are then stored on the same view.
+	const created = createGoal(chosen.goal)
+	const s = state.sessions.get(created.id)!
+	s.view.intent = { ...parsed, budget }
+	s.view.alternatives = chosen.alternatives
+	save(s)
 	return snapshot(s)
 }
 export function getGoal(id: string) { const s = session(id); return s ? snapshot(s) : null }
