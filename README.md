@@ -4,9 +4,15 @@ A multi-agent web app, built on [Mozaik](https://www.npmjs.com/package/@mozaik-a
 
 > **Synthetic data · fictional retailers · not financial or legal advice.** “Likely violation of the 30-day rule” is an automated indication computed from synthetic price histories, not a legal finding.
 
+| Site (landing, live numbers) | Checker results | Mobile scanner |
+|---|---|---|
+| ![Landing](docs/site-landing.png) | ![Checker results](docs/site-results.png) | ![Scanner](docs/site-scanner.png) |
+
+“Under the hood” (`/demo.html`): live agent timeline, headline and product verdicts:
+
 ![Crni Petak Check — live agent timeline, headline and product verdicts](docs/screenshot.png)
 
-<sub>Full page: [docs/screenshot-full.png](docs/screenshot-full.png). Taken in the no-key template mode, after pressing “Fetch next feed page”.</sub>
+<sub>Full page: [docs/screenshot-full.png](docs/screenshot-full.png). All screenshots were taken in no-key template mode.</sub>
 
 JigJoy Black Friday AI Hackathon — **Finance track**.
 
@@ -14,7 +20,7 @@ JigJoy Black Friday AI Hackathon — **Finance track**.
 
 ## What it does
 
-You pick a shopping list (the Black Friday ads you saw). Six agents work on it concurrently and, for every product, produce:
+You pick a shopping list (the Black Friday ads you saw), or scan one product in a shop. Six agents (seven for a scan) work on it concurrently and, for every product, produce:
 
 - **A 30-day-rule check of the ad**: the advertised “before” price against the retailer’s own lowest price in the previous 30 days, the real discount, and the part of the advertised saving that is fake.
 - **2–3 actionable options**, not a label: **Buy now at X** (cheapest non-flagged retailer), **Buy on KP (sealed)** (matched second-hand listing), **Wait ~N days** (only when the history shows a recurring promo dip; labelled as a heuristic). Each option has its saving in RSD, a confidence level (how many independent signals back it) and a risk level.
@@ -22,6 +28,47 @@ You pick a shopping list (the Black Friday ads you saw). Six agents work on it c
 - **A headline for the whole list**: “You avoided **X RSD** in fake discounts · Best plan saves **Y RSD** vs. the ads you saw”.
 
 Every number on screen is a link: click it to see the formula and the dataset rows (feed offer, price-history window with the 30-day minimum highlighted, KP listing, retailer audit, law article, or the agent task that produced it).
+
+## The site
+
+One `npm start` serves everything (no build step):
+
+| Page | What it shows | Fed by |
+|---|---|---|
+| `/` **Landing** | Hero stats (violations, fake discount caught, best-plan saving, flagged retailers), the 30-day rule with citation, the worst ad in the feed, one card per agent with its task count, timeline stats, retailer trust, dataset size | `GET /api/summary`: a **reference run** of the list “Everything in the feed”, started by the engine on the first request and computed by the same agents. Its headline, trust results and timeline statistics are returned as they are |
+| `/#checker` **Checker** | Run any shopping list; headline + per-product verdict cards stream in | `POST /api/runs`, SSE `GET /api/runs/:id/stream`, `GET /api/runs/:id` (same API as the demo UI) |
+| `/scan.html` **Scanner** (mobile) | Scan an EAN-13 barcode (camera or photo) or type a code or name. Shows the **average price in Serbia**, the **world reference average**, the **best place to buy** (the agents’ recommendation) with the saving vs. those averages, the advertised deal’s 30-day check, all options, and per-shop and per-market rows | `POST /api/scans` starts a Mozaik run of kind `scan` for one product, polled through `GET /api/scans/:id` |
+| `/barcodes.html` | Printable EAN-13 sheet of the 14 demo products, for testing the scanner with a phone | `GET /api/products` |
+| `/demo.html` **Under the hood** | The original UI: live agent timeline, event stream, interception details | `/api/runs/*` |
+
+**No number is written into the site’s HTML or JS.** Every figure is a sourced number `{v, unit, src[], f}` from the engine, and clicking it opens its formula and the dataset rows behind it. `npm run test:site` recomputes every landing and scanner figure independently, from the run snapshot, the source endpoint and the data files. It also checks that the pages contain no hardcoded money amounts.
+
+### The scanner and PriceScout
+
+A scan runs the whole agent team on one product, plus a seventh agent, **PriceScout** (`createAgent` + `runLoop`, triggered by `EventIs("feed.completed").and(ScanRun)`). Its `price_reference` tool runs in a worker thread, in parallel with the KP, ShopTrust and Verdict loops, and computes:
+
+- **Average in Serbia**: the mean of the current Black Friday offers at the (fictional) Serbian retailers, plus their 30-day average. The sources are the feed offers and the price histories.
+- **World average**: the mean of `data/world-prices.json`, **synthetic** reference prices for the same EAN in 3–7 markets (DE, AT, HR, HU, PL, UK, US). They are converted to RSD with the **approximate fixed rates** in `data/fx-rates.json`, which are neither live nor official (for official rates see the [NBS exchange rate list](https://www.nbs.rs/en/finansijsko_trziste/informacije-za-javnost/kursna-lista/)). **These are not real market prices**, and every row is labelled synthetic.
+- **Cheapest offer**: the lowest sticker price. When ShopTrust has flagged that retailer, the scanner says so and shows the Verdict agent’s recommendation as the **best place to buy** instead (non-flagged retailer, or a sealed KP listing).
+
+PriceScout’s text summary passes through the same number guard as the other agents.
+
+**Camera requirements.** Phones only grant camera access on **`https://` or `localhost`**. On plain `http://<LAN-IP>:3000` the **Photo** button and manual search still work: the phone’s camera app takes a picture and the page decodes it. For live scanning, choose one:
+- set `HTTPS_KEY=path/key.pem` and `HTTPS_CERT=path/cert.pem` (e.g. from [mkcert](https://github.com/FiloSottile/mkcert)) and the server speaks HTTPS directly;
+- put it behind Caddy (`docs/Caddyfile.example`) or a tunnel that terminates TLS.
+
+Decoding uses the browser’s `BarcodeDetector` when it exists (Chrome on Android) and otherwise the vendored [ZXing](https://github.com/zxing-js/library) build (`public/vendor/zxing.min.js`, Apache-2.0; iOS Safari, desktop). The demo codes are in the GS1 restricted-circulation range (prefix 200–299), so they cannot collide with real products.
+
+### API
+
+| Endpoint | Returns |
+|---|---|
+| `GET /api/summary` | mode, law, dataset counts, agents; reference run `{runId, complete, headline, stats, trust, spotlight}` |
+| `GET /api/meta` | mode, lists, retailers, products, participants |
+| `POST /api/runs {listId}` · `GET /api/runs/:id` · `GET /api/runs/:id/stream` (SSE) · `POST /api/runs/:id/next-page` | shopping-list runs (snapshot includes `stats`) |
+| `GET /api/products?q=` | product lookup by EAN-13, GTIN or name |
+| `POST /api/scans {code}` · `GET /api/scans/:id` | scanner runs: `serbia`, `world`, `serbiaVsWorld`, `cheapestOverall`, `best`, `savings`, `thirtyDay`, `options`, `tasks` |
+| `GET /api/source?ref=&run=` | resolves any source ref: `offer:`, `hist:`, `kp:`, `rule:`, `audit:`, `calc:`, `agent:`, `task:`, `world:`, `fx:`, `stats:`, `dataset:` |
 
 ## The problem and the law
 
@@ -70,6 +117,7 @@ One Node.js process (`server/index.js`) serves the REST API, a Server-Sent Event
 | **CrossShop** | `createAgent` | `EventIs("price.observed")` | Same GTIN across all retailers: current offers, each retailer’s own 30-day minimum, recurring promo dips (worker thread) | worker thread | `signal.crossShop` (discarded if the price version moved on) |
 | **ShopTrust** | `createAgent` + `runLoop` + **InterceptionHandler** | `EventIs("price.observed").and(HasUnauditedRetailer)` | Agent loop: `audit_retailer` tool (worker thread) → trust score 0–100 + rationale. **Owns the interceptor that rewrites in-flight Verdict loops** | LLM calls + worker thread | `trust.assessed` / `trust.flagged` |
 | **Verdict** | `createAgent` + `runLoop` | `EventIs("signal.thirtyDay").or(EventIs("signal.crossShop")).or(EventIs("signal.kp")).and(SignalsCompleteForCurrentVersion).and(VerdictStartedForCurrentVersion.not())` | Agent loop: `compute_options` tool (rules) → explanation. Answers for an outdated version are discarded | LLM calls | `verdict.ready` / `verdict.superseded` |
+| **PriceScout** | `createAgent` + `runLoop` | `EventIs("feed.completed").and(ScanRun)` (scanner runs only) | Agent loop: `price_reference` tool (worker thread): Serbian average, 30-day average, synthetic world reference average in RSD, cheapest offer → short summary (number-guarded) | LLM calls + worker thread | `signal.priceScout` |
 | Shopper | `createHuman` | — | Starts scans, requests the next feed page | — | `message.sent`, `feed.poll.requested` |
 | Timeline | `createHuman` (observer: handlers only) | `AnyEvent` | Binds Mozaik `loopId`s to tasks, records `inference.*`, `function_call.*`, `interception.*`, `model.answer` steps, streams everything to the browser | — | SSE |
 
@@ -116,7 +164,9 @@ Requirements: **Node.js 20+** (tested on Node 24 on Linux and Node 26 on Windows
 ```bash
 npm install
 npm start
-# open http://localhost:3000  → pick a list → "Run check"
+# open http://localhost:3000            → the site (landing + checker)
+#      http://localhost:3000/scan.html  → the scanner (on a phone: see "Camera requirements")
+#      http://localhost:3000/demo.html  → under the hood
 ```
 
 No API key is needed: without one the app starts in **no-key template mode** (yellow badge in the header). Explanations and KP picks then come from deterministic templates/rules, labelled “template” in the UI.
@@ -131,12 +181,13 @@ Copy `.env.example` to `.env` (or set environment variables) and set **one** of:
 | Anthropic / Gemini (Mozaik built-ins) | `LLM_MODEL=claude-haiku-4-5` + `ANTHROPIC_API_KEY`, or `LLM_MODEL=gemini-3.5-flash` + `GEMINI_API_KEY` |
 | Any OpenAI-compatible endpoint | `LLM_BASE_URL=https://…/v1`, `LLM_API_KEY=…`, `LLM_MODEL=<model name>` (OpenRouter, DeepSeek, Ollama, vLLM, …) |
 
-Other variables: `PORT` (default 3000), `HOST`, `LLM_REASONING_EFFORT` (default `low`, only sent to models that support it), `LLM_MODE=template` (force no-key mode). `MOZAIK_API_KEY` is read by Mozaik’s own cloud SDK and enables Mozaik Cloud telemetry; leave it unset to keep everything local. If a provider call fails, the loop continues with the template answer and the card says so.
+Other variables: `PORT` (default 3000), `HOST`, `HTTPS_KEY` + `HTTPS_CERT` (serve HTTPS directly, for the phone camera), `LLM_REASONING_EFFORT` (default `low`, only sent to models that support it), `LLM_MODE=template` (force no-key mode). `MOZAIK_API_KEY` is read by Mozaik’s own cloud SDK and enables Mozaik Cloud telemetry; leave it unset to keep everything local. If a provider call fails, the loop continues with the template answer and the card says so.
 
 ### Tests
 
 ```bash
-npm test               # no-key mode end to end: overlap, interception, superseded results, sourced numbers
+npm test               # smoke test + site test (both in no-key mode)
+npm run test:site      # landing/scanner figures === engine output, recomputed independently; no hardcoded figures in the site
 npm run test:llm-path  # the with-key code path against a local mock OpenAI-compatible server
 npm run data           # regenerate the synthetic dataset (deterministic seed; output is committed)
 ```
@@ -161,15 +212,22 @@ server/
   rules.js            30-day rule, cross-shop, trust audit, options, number guard, law reference
   worker-pool.js      worker_threads pool
   compute-worker.js   KP search, cross-shop scan, retailer audit (runs off the main thread)
-  agents/             price-feed, thirty-day, kp, cross-shop, shop-trust, verdict, timeline
-public/               index.html, app.js, styles.css (no build step)
+  agents/             price-feed, thirty-day, kp, cross-shop, shop-trust, verdict, price-scout, timeline
+public/               no build step
+  index.html site.js site.css     landing + embedded checker
+  scan.html scan.js scan.css      mobile scanner
+  barcodes.html                   printable demo barcodes
+  demo.html app.js styles.css     "under the hood" (timeline, event stream)
+  js/common.js                    sourced-number rendering + source drawer (shared)
+  js/ean13.js                     EAN-13 → SVG encoder
+  vendor/zxing.min.js             @zxing/library 0.23.0 UMD (Apache-2.0), barcode decoding fallback
 data/                 synthetic dataset (generated by scripts/generate-data.js)
 scripts/              data generator, end-to-end tests
 ```
 
 ## Synthetic data
 
-`scripts/generate-data.js` (fixed seed) creates 5 fictional retailers, 14 fictional products, 60 days of daily prices per retailer (2,240 rows), three Black Friday feed pages (page 2 and 3 are late price changes) and 12,066 KupujemProdajem-style listings (matching items, other variants, accessories and noise). Retailer behaviours are scripted so the checks have something to find: honest discounts, “before” prices inflated two weeks before Black Friday, “before” prices ignoring an in-window promo, stale “before” prices from more than 30 days ago, a product listed for less than 30 days (15-day rule) and retailers with recurring promo dips and no Black Friday discount. Any resemblance to real retailers or prices is unintended.
+`scripts/generate-data.js` (fixed seed) creates 5 fictional retailers, 14 fictional products, 60 days of daily prices per retailer (2,240 rows), three Black Friday feed pages (page 2 and 3 are late price changes) 12,066 KupujemProdajem-style listings, a synthetic EAN-13 per product, synthetic world reference prices (75 rows, 7 markets; separate seed stream so the Serbian data is unchanged) with approximate FX rates, (matching items, other variants, accessories and noise). Retailer behaviours are scripted so the checks have something to find: honest discounts, “before” prices inflated two weeks before Black Friday, “before” prices ignoring an in-window promo, stale “before” prices from more than 30 days ago, a product listed for less than 30 days (15-day rule) and retailers with recurring promo dips and no Black Friday discount. Any resemblance to real retailers or prices is unintended.
 
 ## License
 

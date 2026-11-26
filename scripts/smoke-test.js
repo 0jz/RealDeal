@@ -7,7 +7,7 @@ const srv = await startServer(3917, { LLM_MODE: "template" });
 try {
   const meta = await fetch(`${srv.base}/api/meta`).then((r) => r.json());
   check(meta.mode === "template", `server is in no-key template mode (${meta.reason})`, failures);
-  check(meta.agents.length === 8, `8 Mozaik participants joined: ${meta.agents.map((a) => a.name).join(", ")}`, failures);
+  check(meta.agents.length === 9, `9 Mozaik participants joined: ${meta.agents.map((a) => a.name).join(", ")}`, failures);
 
   const snap = await runScan(srv.base, "family");
   const ms = Math.round(snap.completedAt - snap.startedAt);
