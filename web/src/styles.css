@@ -65,8 +65,16 @@
 .intervals small { display: block; min-width: 200px; max-width: 450px; color: var(--muted); }
 .finance-page fieldset { border: 1px solid var(--rule); display: grid; gap: 8px; min-width: 0; }
 .finance-page button:disabled { opacity: .5; cursor: default; }
+.finance-page .item-row { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 14px; padding: 12px 14px 10px; margin: 0 0 10px; }
+.finance-page .item-row legend { font-size: 13px; color: var(--muted); padding: 0 4px; }
+.finance-page .item-row .field.wide { grid-column: span 2; }
+.finance-page .row-foot { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 32px; }
+.finance-page .form-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.finance-page .risks { margin: 0; padding-left: 18px; flex-basis: 100%; font-size: 14px; color: var(--kp); }
+.finance-page .risks.blocked { color: var(--fake); }
 @media (max-width: 600px) {
 	.finance-metrics { grid-template-columns: 1fr 1fr; }
+	.finance-page .item-row { grid-template-columns: 1fr 1fr; }
 	.strategy-actions li { grid-template-columns: 45px 1fr; gap: 8px; }
 	.strategy-actions li > strong { grid-column: 2; }
 	.execution-lane { grid-template-columns: 105px 1fr; font-size: 11px; }

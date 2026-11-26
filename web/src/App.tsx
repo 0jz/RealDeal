@@ -66,7 +66,7 @@ function requestFor(mode: SearchMode, query: string, budget: number, category: C
 
 export function App() {
 	const [screen, setScreen] = useState<"strategy" | "search">("strategy")
-	return <><nav className="app-nav" aria-label="Main navigation"><button className="ghost" aria-pressed={screen === "strategy"} onClick={() => setScreen("strategy")}>Buy + sell strategy</button><button className="ghost" aria-pressed={screen === "search"} onClick={() => setScreen("search")}>Search / budget / sell tools</button></nav>{screen === "strategy" ? <Finance /> : <SearchApp />}</>
+	return <><nav className="app-nav" aria-label="Main navigation"><button className="ghost" aria-pressed={screen === "strategy"} onClick={() => setScreen("strategy")}>Buy + sell plan</button><button className="ghost" aria-pressed={screen === "search"} onClick={() => setScreen("search")}>Price search (sample data)</button></nav>{screen === "strategy" ? <Finance /> : <SearchApp />}</>
 }
 
 function SearchApp() {

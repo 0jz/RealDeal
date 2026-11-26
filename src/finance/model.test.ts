@@ -1,92 +1,108 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
 import { test } from "node:test"
-import { DEMO_GOAL } from "./engine"
-import { cashBalance, emptyLedger, optimize, reserved, transact, validateGoal } from "./model"
-import type { Offer, Resale } from "./types"
-const offers = JSON.parse(readFileSync(new URL("../../data/strategy/offers.json", import.meta.url), "utf8")) as Offer[]
-const resale: Resale[] = [{ assetId: "old-phone", gross: 31000, net: 30000, low: 29000, high: 31000, confidence: "medium", days: 5, comparables: 3, basis: "synthetic asking prices" }]
+import { EXAMPLE_GOAL } from "./engine"
+import { assessOffers, cashBalance, emptyLedger, estimateResale, matchProduct, optimize, reserved, transact, validateGoal } from "./model"
+import type { Goal } from "./types"
 
-test("target scenario: estimates are conditional, 7k remains, net acquisition 63k", () => {
-	const plan = optimize(DEMO_GOAL, emptyLedger(), offers, resale)
-	assert.equal(plan.expectedCosts, 93000); assert.equal(plan.estimatedResale, 30000)
-	assert.equal(plan.availableCash, 70000); assert.equal(plan.projectedRemaining, 7000)
-	assert.equal(plan.netAcquisitionCost, 63000); assert.equal(plan.conditional, true)
-	assert.equal(plan.verifiedSavings, 0)
+const G = EXAMPLE_GOAL
+const withWish = (g: Goal, id: string, patch: Partial<Goal["wishes"][number]>): Goal => ({ ...g, wishes: g.wishes.map(w => w.id === id ? { ...w, ...patch } : w) })
+const plan = (g: Goal, l = emptyLedger()) => optimize(g, l, assessOffers(g), estimateResale(g))
+
+test("names match the catalogue only when unambiguous", () => {
+	assert.equal(matchProduct("iPhone 15"), "iphone-15")
+	assert.equal(matchProduct("AirPods Pro 2"), "airpods-pro-2")
+	assert.equal(matchProduct("grandma's bike"), null)
 })
-test("normal cash purchase never sells an asset unnecessarily", () => {
-	const g = { ...DEMO_GOAL, cash: 100000 }
+test("example: the sale funds the gap, 3,600 remains, plan is conditional", () => {
+	const p = plan(G)
+	assert.equal(p.expectedCosts, 110400); assert.equal(p.estimatedResale, 39000)
+	assert.equal(p.availableCash, 75000); assert.equal(p.projectedRemaining, 3600)
+	assert.equal(p.netAcquisitionCost, 71400); assert.equal(p.conditional, true)
+	assert.equal(p.forecastSavings, 4600, "AirPods 25,400 delivered vs typical 30,000")
+})
+test("enough cash never sells anything", () => {
+	const g = { ...G, cash: 120000 }
 	const l = emptyLedger()
-	const plan = optimize(g, l, offers, resale)
-	assert.equal(plan.estimatedResale, 0); assert.equal(plan.conditional, false)
-	transact(g, l, offers, { type: "buy", offerId: "phone-best" })
-	transact(g, l, offers, { type: "buy", offerId: "headphones" })
-	assert.equal(cashBalance(g, l), 7000)
+	const p = plan(g, l)
+	assert.equal(p.estimatedResale, 0); assert.equal(p.conditional, false)
+	const offers = assessOffers(g)
+	transact(g, l, offers, { type: "buy", offerId: "phone" })
+	transact(g, l, offers, { type: "buy", offerId: "audio" })
+	assert.equal(cashBalance(g, l), 9600)
+	assert.equal(l.verifiedSavings, 4600)
 })
-test("forecast drop defers headphones; cheaper phone restores both", () => {
-	const lower = resale.map(r => ({ ...r, net: 20000 }))
-	const plan = optimize(DEMO_GOAL, emptyLedger(), offers, lower)
-	assert.equal(plan.complete, false); assert.deepEqual(plan.selectedOffers, ["phone-best"])
-	assert.ok(plan.actions.some(a => a.kind === "wait" && a.id === "audio"))
-	assert.equal(plan.projectedRemaining, 5000)
-	const cheap = offers.map(o => o.id === "phone-best" ? { ...o, price: 80000 } : o)
-	const restored = optimize(DEMO_GOAL, emptyLedger(), cheap, lower)
-	assert.equal(restored.complete, true); assert.equal(restored.projectedRemaining, 2000)
+test("a lower sale price defers the second wish; a cheaper offer restores it", () => {
+	const lower = { ...G, assets: G.assets.map(a => ({ ...a, expectedPrice: 30000 })) }
+	const p = plan(lower)
+	assert.equal(p.complete, false); assert.deepEqual(p.selectedOffers, ["phone"])
+	assert.ok(p.actions.some(a => a.kind === "wait" && a.id === "audio"))
+	const cheaper = withWish(lower, "phone", { price: 75000 })
+	const restored = plan(cheaper)
+	assert.equal(restored.complete, true); assert.equal(restored.projectedRemaining, 3600)
 })
-test("estimated funds cannot be spent; only net confirmed receipts add cash", () => {
+test("expected sale money can't be spent; only recorded sales add cash", () => {
 	const l = emptyLedger()
-	assert.throws(() => transact(DEMO_GOAL, l, offers, { type: "buy", offerId: "phone-best" }), /Insufficient confirmed cash/)
+	const offers = assessOffers(G)
+	assert.throws(() => transact(G, l, offers, { type: "buy", offerId: "phone" }), /Not enough cash/)
 	assert.equal(l.spent, 0)
-	transact(DEMO_GOAL, l, offers, { type: "confirm-sale", assetId: "old-phone", gross: 31000 })
-	assert.equal(l.confirmedResale, 30000)
-	transact(DEMO_GOAL, l, offers, { type: "buy", offerId: "phone-best" })
-	transact(DEMO_GOAL, l, offers, { type: "buy", offerId: "headphones" })
-	assert.equal(cashBalance(DEMO_GOAL, l), 7000)
-	assert.throws(() => transact(DEMO_GOAL, l, offers, { type: "confirm-sale", assetId: "old-phone", gross: 31000 }), /already sold/)
-	assert.throws(() => transact(DEMO_GOAL, l, offers, { type: "buy", offerId: "phone-best" }), /already purchased/)
+	transact(G, l, offers, { type: "confirm-sale", assetId: "old-phone", gross: 40000 })
+	assert.equal(l.confirmedResale, 39000)
+	transact(G, l, offers, { type: "buy", offerId: "phone" })
+	transact(G, l, offers, { type: "buy", offerId: "audio" })
+	assert.equal(cashBalance(G, l), 3600)
+	assert.throws(() => transact(G, l, offers, { type: "confirm-sale", assetId: "old-phone", gross: 40000 }), /already sold/)
+	assert.throws(() => transact(G, l, offers, { type: "buy", offerId: "phone" }), /already bought/)
 })
-test("reservations and untouched reserve are enforced atomically", () => {
-	const g = { ...DEMO_GOAL, cash: 93000, reserve: 1000 }
+test("set-aside money and the reserve are enforced", () => {
+	const g = { ...G, cash: 110000, reserve: 1000 }
 	const l = emptyLedger()
-	transact(g, l, offers, { type: "reserve", offerId: "phone-best" })
+	const offers = assessOffers(g)
+	transact(g, l, offers, { type: "reserve", offerId: "phone" })
 	assert.equal(reserved(l), 85000)
-	assert.throws(() => transact(g, l, offers, { type: "buy", offerId: "headphones" }), /Insufficient/)
-	transact(g, l, offers, { type: "buy", offerId: "phone-best" })
-	assert.equal(reserved(l), 0); assert.equal(cashBalance(g, l), 8000)
+	assert.throws(() => transact(g, l, offers, { type: "buy", offerId: "audio" }), /Not enough cash/)
+	transact(g, l, offers, { type: "buy", offerId: "phone" })
+	assert.equal(reserved(l), 0); assert.equal(cashBalance(g, l), 25000)
 })
-test("unknown delivery, seller risk, warranty and misleading discounts fail closed", () => {
-	const g = { ...DEMO_GOAL, cash: 1000000 }
-	for (const update of [{ delivery: null }, { trust: 20 }, { warrantyMonths: 0 }, { advertisedPrevious: 150000 }, { history: [] }]) {
-		const unsafe = offers.map(o => o.id === "phone-best" ? { ...o, ...update } : o)
-		assert.throws(() => transact(g, emptyLedger(), unsafe, { type: "buy", offerId: "phone-best" }), /unsafe/)
-		assert.ok(!optimize(g, emptyLedger(), unsafe, resale).selectedOffers.includes("phone-best"))
+test("unknown delivery, short warranty and too-good-to-be-true prices are blocked", () => {
+	const rich = { ...G, cash: 1000000 }
+	for (const patch of [{ delivery: null }, { warrantyMonths: 0 }, { price: 30000 }]) {
+		const g = withWish(rich, "phone", patch)
+		const offers = assessOffers(g)
+		assert.ok(offers.find(o => o.id === "phone")!.blocked, JSON.stringify(patch))
+		assert.throws(() => transact(g, emptyLedger(), offers, { type: "buy", offerId: "phone" }), /blocked/)
+		assert.ok(!plan(g).selectedOffers.includes("phone"))
 	}
+	const noShop = assessOffers(withWish(rich, "phone", { shop: "" })).find(o => o.id === "phone")!
+	assert.equal(noShop.blocked, false); assert.ok(noShop.risks.includes("No shop named"))
 })
-test("illiquid resale cannot finance a deadline; no comparables means no forecast", () => {
-	const g = { ...DEMO_GOAL, deadlineDays: 1 }
-	assert.equal(optimize(g, emptyLedger(), offers, resale).estimatedResale, 0)
-	assert.equal(optimize(g, emptyLedger(), offers, []).estimatedResale, 0)
+test("sale price falls back to a labelled catalogue estimate; unknown items can't fund anything", () => {
+	const est = estimateResale({ ...G, assets: [{ ...G.assets[0], expectedPrice: null }] })
+	assert.equal(est[0].basis, "catalogue estimate"); assert.equal(est[0].confidence, "low")
+	assert.equal(est[0].gross, 31000)
+	assert.deepEqual(estimateResale({ ...G, assets: [{ ...G.assets[0], name: "old bike", expectedPrice: null }] }), [])
+	assert.equal(plan({ ...G, deadlineDays: 1 }).estimatedResale, 0, "a sale slower than the deadline can't fund it")
 })
-test("pending seller assessment is blocked even when the user allows low trust", () => {
-	const g = { ...DEMO_GOAL, cash: 1000000, minTrust: 0 }
-	const pending = offers.map(o => ({ ...o, trust: -1 }))
-	assert.equal(optimize(g, emptyLedger(), pending, resale).selectedOffers.length, 0)
-	assert.throws(() => transact(g, emptyLedger(), pending, { type: "buy", offerId: "phone-best" }), /unsafe/)
+test("unchecked offers are never selected", () => {
+	const unchecked = assessOffers(G).map(o => ({ ...o, blocked: true }))
+	assert.equal(optimize({ ...G, cash: 1000000 }, emptyLedger(), unchecked, []).selectedOffers.length, 0)
 })
-test("invalid amounts cannot mutate a ledger", () => {
+test("invalid input can't mutate a ledger or create a goal", () => {
 	for (const gross of [-1, NaN, Infinity, 1.25, 9999999999999999, 999]) {
 		const l = emptyLedger()
-		assert.throws(() => transact(DEMO_GOAL, l, offers, { type: "confirm-sale", assetId: "old-phone", gross }))
+		assert.throws(() => transact(G, l, assessOffers(G), { type: "confirm-sale", assetId: "old-phone", gross }))
 		assert.deepEqual(l, emptyLedger())
 	}
-	for (const cash of [-1, NaN, Infinity, 0.5]) assert.throws(() => validateGoal({ ...DEMO_GOAL, cash }))
-	assert.throws(() => validateGoal({ ...DEMO_GOAL, wishes: [...DEMO_GOAL.wishes, DEMO_GOAL.wishes[0]] }))
+	for (const cash of [-1, NaN, Infinity, 0.5]) assert.throws(() => validateGoal({ ...G, cash }))
+	assert.throws(() => validateGoal({ ...G, wishes: [...G.wishes, G.wishes[0]] }), /Duplicate/)
+	assert.throws(() => validateGoal(withWish(G, "phone", { link: "javascript:alert(1)" })), /http/)
+	assert.throws(() => validateGoal(withWish(G, "phone", { price: 0 })), /price/)
+	assert.throws(() => validateGoal({ ...G, wishes: [] }))
 })
-test("budget sweep: all conditional plans conserve resources and preserve reserves", () => {
-	for (let cash = 0; cash <= 120000; cash += 999) {
-		const g = { ...DEMO_GOAL, cash, reserve: Math.floor(cash / 10) }
-		for (const net of [0, 20000, 30000]) {
-			const p = optimize(g, emptyLedger(), offers, resale.map(r => ({ ...r, net })))
+test("budget sweep: every plan conserves money and keeps the reserve", () => {
+	for (let cash = 0; cash <= 150000; cash += 999) {
+		for (const expectedPrice of [0, 30000, 40000]) {
+			const g = { ...G, cash, reserve: Math.floor(cash / 10), assets: G.assets.map(a => ({ ...a, expectedPrice })) }
+			const p = plan(g)
 			assert.ok(p.projectedRemaining >= g.reserve)
 			assert.equal(p.projectedRemaining, cash + p.estimatedResale - p.expectedCosts)
 			assert.ok(p.availableCash >= 0)

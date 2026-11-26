@@ -1,22 +1,34 @@
-/** All amounts are integer RSD. This MVP executes only simulated transactions. */
+/** All amounts are integer RSD. Prices come from the user; nothing is bought or sold by the app. */
+export type Wish = {
+	id: string; name: string; priority: number
+	/** The offer the user found: price, delivery (null = unknown), shop, optional link. */
+	price: number; delivery: number | null; shop: string; link: string
+	warrantyMonths: number; condition: "new" | "used"
+}
+export type Asset = {
+	id: string; name: string; condition: "good" | "fair"
+	/** What the user expects to get. Null = estimate it from the catalogue's typical price. */
+	expectedPrice: number | null; fee: number; delivery: number; days: number
+}
 export type Goal = {
 	title: string
 	cash: number
 	reserve: number
 	deadlineDays: number
-	minTrust: number
 	minWarrantyMonths: number
-	wishes: { id: string; productId: string; name: string; priority: number }[]
-	assets: { id: string; productId: string; name: string; condition: "good" | "fair"; fee: number; delivery: number }[]
+	wishes: Wish[]
+	assets: Asset[]
 }
 export type Offer = {
-	id: string; productId: string; name: string; price: number; delivery: number | null
-	seller: string; trust: number; warrantyMonths: number; condition: "new" | "used"
-	history: number[]; advertisedPrevious: number; synthetic: true
+	id: string; wishId: string; productId: string | null; name: string; price: number; delivery: number | null
+	shop: string; link: string; warrantyMonths: number; condition: "new" | "used"
+	/** Rough typical new price from the catalogue, when the name matches a known product. */
+	typicalPrice: number | null
+	risks: string[]; blocked: boolean
 }
 export type Resale = {
 	assetId: string; gross: number; net: number; low: number; high: number
-	confidence: "low" | "medium"; days: number; comparables: number; basis: "synthetic asking prices"
+	confidence: "low" | "medium"; days: number; basis: "your price" | "catalogue estimate"
 }
 export type Ledger = {
 	confirmedResale: number; spent: number; verifiedSavings: number
@@ -40,13 +52,11 @@ export type AgentRun = {
 export type FinanceView = {
 	id: string; revision: number; sequence: number; goal: Goal; offers: Offer[]; resale: Resale[]; ledger: Ledger; plan: Plan
 	reason: string; history: { revision: number; reason: string }[]; runs: AgentRun[]
-	notes: Record<string, string>; pending: number; synthetic: true
+	notes: Record<string, string>; pending: number; updatedAt: string
 }
 export type Command =
-	| { type: "resale-drop" }
-	| { type: "cheaper-offer" }
-	| { type: "trust-drop" }
 	| { type: "refresh" }
+	| { type: "update-goal"; goal: Goal }
 	| { type: "confirm-sale"; assetId: string; gross: number }
 	| { type: "reserve"; offerId: string }
 	| { type: "release"; offerId: string }

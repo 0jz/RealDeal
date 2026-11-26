@@ -58,18 +58,30 @@ The old search runtime/contracts, query expansion, multilingual matcher, product
 
 ## Remaining limits and technical risks
 
-- The focused strategy uses three synthetic purchase offers and two resale comparable sets. It does not yet connect the full search catalogue or live Gigatron prices to the ledger. A title is descriptive; selected products and explicit fields define the goal, not unrestricted natural-language parsing.
+- Since the real-app update, the planner works only from prices the user enters plus catalogue typical prices; it does not fetch live offers. A title is descriptive; explicit fields define the goal, not natural-language parsing.
 - This is real concurrent Mozaik execution with asynchronous local I/O offline. Live remote LLM inference was **not** exercised because no provider credentials were configured for this checkout. Provider success/interception/failure paths were tested with controlled HTTP responses. Rehearse `REALDEAL_LLM=1` with a real key before claiming concurrent remote AI execution on stage.
 - Model explanations are advisory and can still be inaccurate; the deterministic plan and financial guards remain authoritative. Provider latency/cost requires a live rehearsal. Native 6.0.0 loops have no exposed cancellation handle; submitted requests run until response or the configured HTTP timeout, then stale results are discarded.
-- Sale ranges, liquidity days, condition adjustments and trust are explicit synthetic assumptions, not calibrated market predictions. No completed-sale dataset is available. Real savings and legal compliance are not verified.
-- Sessions and bot watches are in memory; no authentication, durable ledger, recovery, multi-replica coordination or production personal-data storage. Navigating away/reloading can abandon the current UI session. The simulation is appropriate for the hackathon, not real transactions.
+- Catalogue sale estimates (50%/40% of typical new price) and the risk thresholds are fixed rules, not calibrated market predictions. No completed-sale dataset is available. Real savings and legal compliance are not verified.
+- Plans are saved as JSON files and reload by link, but there is no authentication: anyone with a plan link can change it. No multi-replica coordination, backups or clean-up of old plan files. Bot watches remain in memory.
 - Financial strategy is web/API only. Telegram retains search/budget/sell commands; no real bot message was sent during validation.
-- Public hosting, Docker image execution and hosted CI were not part of local validation. CI configuration and the container recipe are provided; public deployment remains an explicit later action. The opt-in live adapter was not used in the demo or tested against the real retailer during this change.
+- Public hosting and Docker image execution were not part of local validation. Hosted CI has since passed on `main`; the container recipe is provided; public deployment remains an explicit later action. The opt-in live adapter was not used in the demo or tested against the real retailer during this change.
 - The original search tools retain unknown-delivery display/estimation semantics. Only the new financial strategy fails closed on unknown delivery. Live matcher completion and legacy timeline behavior remain separate from the stronger financial-loop lifecycle.
-- No real listings, purchases, payments, commitments or main-branch merge were performed.
+- No real listings, purchases, payments or commitments were performed.
 
 ## Handoff
 
-Branch: [feature/buy-sell-financial-agent](https://github.com/0jz/RealDeal/tree/feature/buy-sell-financial-agent).
+Branch: [feature/buy-sell-financial-agent](https://github.com/0jz/RealDeal/tree/feature/buy-sell-financial-agent), merged into `main` on November 26, 2026 (`61f66e4`). Hosted CI passed on `main` after the merge.
 
 Run `npm ci && npm run dev` from the repository root. For a production rehearsal, run `npm run build && npm start`. README.md contains the exact three-minute presentation and optional LLM configuration. The primary demo is intentionally small enough to reproduce without accounts or external market services.
+
+## Real-app update (November 26, 2026)
+
+The synthetic strategy data was replaced by user input, so the hosted app shows nothing fake as real:
+
+- Goals now hold the user's own offers (price, delivery, shop, link, warranty, condition) and items to sell (expected price, fees, delivery, days). Names match the catalogue only when unambiguous; the typical price drives hints, savings and a too-cheap-to-be-true check.
+- Offer checks block unknown delivery, short warranty and suspiciously low prices; missing shop and non-https links are warnings. Missing sale prices fall back to a labelled low-confidence catalogue estimate.
+- The UI is an editable form (up to 5 items each) with an example, plan updates via an `update-goal` command, and "track what you did" actions. The plan id lives in the URL.
+- Plans persist to `data/sessions/` and reload after a restart; new plans are rate-limited per IP (20/hour, `TRUST_PROXY=1` behind a proxy).
+- `data/strategy/` is no longer read by the code.
+
+Validation: `npm test` 88 passed; typecheck, `npm run check`, `npm run check:finance` and `npm run build` passed; browser check of the example plan (3,600 RSD left), recording a sale, reload after a server restart, and the phone layout.

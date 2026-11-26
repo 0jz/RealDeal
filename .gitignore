@@ -6,3 +6,4 @@ data/out/
 *.log
 .DS_Store
 data/cache/
+data/sessions/

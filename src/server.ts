@@ -5,7 +5,8 @@ import { extname, join, normalize } from "node:path"
 import { resolveRuntime, type LogEntry } from "./runtime"
 import { cancel, search, startEngine, subscribe } from "./search/engine"
 import type { Category, SearchMode, SearchRequest } from "./search/types"
-import { commandGoal, createGoal, DEMO_GOAL, getGoal, subscribeGoal } from "./finance/engine"
+import { commandGoal, createGoal, EXAMPLE_GOAL, getGoal, subscribeGoal } from "./finance/engine"
+import { CATALOGUE } from "./search/catalogue"
 import type { CommandRequest } from "./finance/types"
 
 // One process: the Mozaik search swarm, a small JSON API, an SSE stream per
@@ -73,10 +74,28 @@ function openStream(id: string, req: IncomingMessage, res: ServerResponse) {
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
+/** Behind a reverse proxy (TRUST_PROXY=1) the client address is the first X-Forwarded-For entry. */
+const clientIp = (req: IncomingMessage) =>
+	(process.env.TRUST_PROXY === "1" ? String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() : "") || req.socket.remoteAddress || "?"
+/** At most PLAN_LIMIT new plans per address per hour. */
+const PLAN_LIMIT = 20
+const created = new Map<string, number[]>()
+function allowPlan(ip: string): boolean {
+	const now = Date.now()
+	const recent = (created.get(ip) ?? []).filter((t) => now - t < 3_600_000)
+	if (recent.length >= PLAN_LIMIT) return created.set(ip, recent), false
+	created.set(ip, [...recent, now])
+	if (created.size > 10_000) for (const [k, v] of created) if (v.every((t) => now - t >= 3_600_000)) created.delete(k)
+	return true
+}
+const PRODUCT_LIST = CATALOGUE.map((p) => ({ name: p.model, brand: p.brand, typicalPrice: p.msrp }))
+
 async function api(req: IncomingMessage, res: ServerResponse, path: string): Promise<void> {
-	if (req.method === "GET" && path === "/api/health") return json(res, 200, { ok: true, transactions: "simulated" })
-	if (req.method === "GET" && path === "/api/goal/demo") return json(res, 200, DEMO_GOAL)
+	if (req.method === "GET" && path === "/api/health") return json(res, 200, { ok: true })
+	if (req.method === "GET" && path === "/api/goal/example") return json(res, 200, EXAMPLE_GOAL)
+	if (req.method === "GET" && path === "/api/products") return json(res, 200, PRODUCT_LIST)
 	if (req.method === "POST" && path === "/api/goal") {
+		if (!allowPlan(clientIp(req))) return json(res, 429, { error: "Too many new plans from your address; try again later" })
 		try { return json(res, 201, createGoal(await readBody(req))) }
 		catch (error) { return json(res, 400, { error: errorText(error) }) }
 	}
@@ -84,7 +103,7 @@ async function api(req: IncomingMessage, res: ServerResponse, path: string): Pro
 	if (goalRoute) {
 		const id = goalRoute[1]
 		const view = getGoal(id)
-		if (!view) return json(res, 404, { error: "Unknown goal" })
+		if (!view) return json(res, 404, { error: "Plan not found" })
 		if (req.method === "GET" && !goalRoute[2]) return json(res, 200, view)
 		if (req.method === "GET" && goalRoute[2] === "stream") {
 			res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" })
