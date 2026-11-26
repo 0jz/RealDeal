@@ -18,3 +18,35 @@ jobs:
       - run: npm run check
       - run: npm run check:finance
       - run: npm run build
+  deploy:
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Package release
+        run: |
+          echo "$GITHUB_SHA" > REVISION
+          git archive --format=tar -o release.tar HEAD
+          tar -rf release.tar web/dist REVISION
+          gzip release.tar
+      - name: Deploy to the server
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          echo "92.6.28.142 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ4ZNBLlktuT7ZkxEypb6o7flQCnbswSUTfmP+4KOHbh" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes deploy@92.6.28.142 < release.tar.gz
+      - name: Check the public site
+        run: curl -fsS --retry 5 --retry-delay 3 https://realdeal.92-6-28-142.sslip.io/api/health

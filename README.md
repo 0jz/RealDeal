@@ -98,4 +98,6 @@ Discount checks are reference-price screening, not a definitive legal verdict. M
 
 CI runs tests, type checks, both scenario checks and a production build. Docker recipe (not required for local use): `docker build -t realdeal .` then `docker run --rm -p 8787:8787 realdeal`. For a server, run `npm start` behind a TLS reverse proxy (e.g. Caddy) with `TRUST_PROXY=1`, and keep `data/sessions/` on persistent disk.
 
+Live at https://realdeal.92-6-28-142.sslip.io. Every push to `main` that passes CI deploys there automatically: the `deploy` job builds the UI, packs the release and pipes it over SSH to [`deploy/realdeal-deploy.sh`](deploy/realdeal-deploy.sh), the only command the `DEPLOY_SSH_KEY` key may run. The script installs the release next to the previous ones, restarts the service and rolls back if `/api/health` fails.
+
 See [implementation assessment, validation and limitations](docs/IMPLEMENTATION_REPORT.md).
