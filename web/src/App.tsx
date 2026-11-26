@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react"
 import { useSearch } from "./stream"
 import { Timeline } from "./Timeline"
-import { Finance } from "./Finance"
+import { Planner } from "./Planner"
 import type {
 	Category,
 	Condition,
@@ -64,12 +64,13 @@ function requestFor(mode: SearchMode, query: string, budget: number, category: C
 	return budget > 0 ? { mode, query: query.trim(), budget, category: category || null, origin: "web" } : null
 }
 
+/** The planner is the only screen. The price search (SearchApp) is kept but not rendered. */
 export function App() {
-	const [screen, setScreen] = useState<"strategy" | "search">("strategy")
-	return <><nav className="app-nav" aria-label="Main navigation"><button className="ghost" aria-pressed={screen === "strategy"} onClick={() => setScreen("strategy")}>Buy + sell plan</button><button className="ghost" aria-pressed={screen === "search"} onClick={() => setScreen("search")}>Price search (sample data)</button></nav>{screen === "strategy" ? <Finance /> : <SearchApp />}</>
+	return <Planner />
 }
 
-function SearchApp() {
+/** Price search screen. Not rendered from App for now; kept for later. */
+export function SearchApp() {
 	const { view, store, running, error, run } = useSearch()
 	const [mode, setMode] = useState<SearchMode>("search")
 	const [query, setQuery] = useState("")

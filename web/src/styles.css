@@ -27,8 +27,6 @@
 	color-scheme: light;
 }
 
-.app-nav { max-width: 1200px; margin: 18px auto 0; padding: 0 var(--gutter); display: flex; flex-wrap: wrap; gap: 8px; }
-.app-nav button[aria-pressed="true"] { background: var(--ink); color: var(--sheet); }
 .finance-page h2 { font-size: 23px; }
 .finance-page h3 { font-size: 16px; }
 .choice { display: flex; gap: 8px; align-items: center; padding: 8px 0; }
@@ -988,6 +986,302 @@ a {
 	}
 }
 
+/* ---- Planner: one prompt, then the plan -------------------------------- */
+
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+
+.brand {
+	font-size: 13px;
+	font-weight: 800;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.ask {
+	width: 100%;
+	max-width: 720px;
+	margin: 0 auto;
+	padding-top: clamp(8px, 8vh, 72px);
+	display: grid;
+	gap: 16px;
+	justify-items: center;
+	text-align: center;
+}
+
+.ask h1 {
+	font-size: clamp(28px, 5.5vw, 44px);
+	font-weight: 850;
+	font-stretch: 118%;
+	letter-spacing: -0.02em;
+	line-height: 1.05;
+}
+
+.ask-box {
+	width: 100%;
+	display: grid;
+	gap: 10px;
+	text-align: left;
+}
+
+.ask-box .field textarea {
+	font-size: 17px;
+	min-height: 120px;
+	background: var(--sheet);
+}
+
+.ask-foot {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: center;
+	gap: 12px;
+}
+
+.ask-foot .primary {
+	margin-left: auto;
+}
+
+.counter {
+	font-size: 13px;
+	color: var(--muted);
+	min-height: 1em;
+}
+
+.counter.near {
+	color: var(--kp);
+	font-weight: 700;
+}
+
+.ask .examples {
+	width: 100%;
+	justify-items: center;
+}
+
+.ask .examples ul {
+	justify-content: center;
+}
+
+.planner-bar {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: center;
+	gap: 12px;
+}
+
+.planner-bar .brand {
+	color: var(--ink);
+}
+
+.planner-actions {
+	display: flex;
+}
+
+.understood {
+	position: relative;
+	background: var(--sheet);
+	border: 1px solid var(--rule);
+	border-top: 3px solid var(--cross);
+	border-radius: 0 0 4px 4px;
+	padding: 16px 18px;
+	display: grid;
+	gap: 12px;
+}
+
+.chip-row {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.chip-wrap {
+	position: relative;
+}
+
+.chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: 1.5px solid var(--ink);
+	border-radius: 3px;
+	background: var(--paper);
+	padding: 6px 10px;
+	font-size: 14px;
+	font-weight: 600;
+	transition: transform 120ms ease-out, background-color 150ms ease-out, color 150ms ease-out;
+}
+
+.chip:active {
+	transform: scale(0.97);
+}
+
+.chip[aria-expanded="true"] {
+	background: var(--ink);
+	color: var(--sheet);
+}
+
+.pop {
+	position: absolute;
+	z-index: 10;
+	top: calc(100% + 6px);
+	left: 0;
+	width: min(320px, calc(100vw - 2 * var(--gutter)));
+	max-width: 100%;
+	background: var(--sheet);
+	border: 1.5px solid var(--ink);
+	border-radius: 4px;
+	padding: 14px;
+	display: grid;
+	gap: 12px;
+	box-shadow: 0 12px 28px rgb(0 0 0 / 0.16);
+	transform-origin: top left;
+	animation: pop-in 180ms ease-out both;
+}
+
+.pop:focus {
+	outline: none;
+}
+
+.pop-title {
+	font-size: 16px;
+	font-weight: 800;
+}
+
+.pop-block {
+	display: grid;
+	gap: 8px;
+	border-top: 1px solid var(--rule);
+	padding-top: 10px;
+}
+
+.pop h3 {
+	font-size: 12.5px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--muted);
+}
+
+.pop .field {
+	gap: 6px;
+}
+
+.pop .field select {
+	font-size: 15px;
+	padding: 8px 10px;
+}
+
+.pop-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.pop-row input {
+	flex: 1 1 140px;
+	min-width: 0;
+	font-size: 15px;
+	padding: 8px 10px;
+	border: 1.5px solid var(--ink);
+	border-radius: 3px;
+	background: var(--paper);
+}
+
+.swap-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	gap: 6px;
+}
+
+.swap-list button {
+	width: 100%;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 4px 12px;
+	text-align: left;
+	background: var(--paper);
+	border: 1px solid var(--rule);
+	border-radius: 3px;
+	padding: 8px 10px;
+	transition: transform 120ms ease-out, border-color 150ms ease-out;
+}
+
+.swap-list button:hover:not(:disabled) {
+	border-color: var(--ink);
+}
+
+.swap-list button:active:not(:disabled) {
+	transform: scale(0.97);
+}
+
+.pop-foot {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 12px;
+	border-top: 1px solid var(--rule);
+	padding-top: 10px;
+}
+
+.price-label {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--muted);
+}
+
+.paid-field {
+	width: min(100%, 220px);
+}
+
+@keyframes pop-in {
+	from {
+		opacity: 0;
+		transform: scale(0.95);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@media (max-width: 600px) {
+	.ask-foot .primary {
+		width: 100%;
+		margin-left: 0;
+	}
+
+	.understood {
+		padding: 14px;
+	}
+
+	/* On phones the popover spans the card instead of hanging off its chip, so it cannot run past the screen edge. */
+	.understood .chip-wrap {
+		position: static;
+	}
+
+	.pop {
+		left: 0;
+		right: 0;
+		width: auto;
+		transform-origin: top center;
+	}
+}
+
 @keyframes rise {
 	from {
 		opacity: 0;
@@ -1003,7 +1297,10 @@ a {
 	.row,
 	.primary,
 	.ghost,
-	.examples button {
+	.examples button,
+	.chip,
+	.swap-list button,
+	.pop {
 		animation: none;
 		transition: none;
 	}
