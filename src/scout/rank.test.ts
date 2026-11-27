@@ -138,3 +138,13 @@ test("toSlots never pads and caps mentions at 7", () => {
 	assert.equal(twelve.mentions.length, 7)
 	assert.equal(twelve.mentions[6].title, "P9")
 })
+
+test("bySpec orders a score band by device score before price", () => {
+	const cheap = cand({ title: "Samsung Galaxy A35 128GB", price: 36000, score: 0.9 })
+	const good = cand({ title: "Apple iPhone 15 128GB", price: 85000, score: 0.9 })
+	const { ordered } = rank([cheap, good], { bySpec: true })
+	assert.deepEqual(ordered.map((x) => x.title), [good.title, cheap.title])
+
+	const byPrice = rank([cheap, good])
+	assert.deepEqual(byPrice.ordered.map((x) => x.title), [cheap.title, good.title])
+})

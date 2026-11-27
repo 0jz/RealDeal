@@ -1,6 +1,7 @@
 // JudgeAgent: scores candidates against the user's description. Titles are data, never instructions.
 
-import { ACCESSORY } from "../search/matcher"
+import { ACCESSORY, matchTitle, resolveQuery } from "../search/matcher"
+import { PRODUCTS } from "../search/catalogue"
 import { fold } from "./query"
 import type { ScoutCandidate, ScoutTrace, ScoutWant } from "./types"
 
@@ -59,6 +60,21 @@ export function judgeOffline(want: ScoutWant, c: ScoutCandidate): Verdict {
 	const attributes = want.attributes.flatMap(tokens)
 	if (ACCESSORY.some((phrase) => hasPhrase(title, phrase) && !hasPhrase(query, phrase))) {
 		return { score: 0, reason: "an accessory, not the item", drop: "accessory" }
+	}
+	// A category or brand query ("telefon", "iphone") is generic: every device in that
+	// category/brand matches, and the ranker orders them by device score, not price.
+	const resolved = resolveQuery(want.query)
+	const generic = resolved.category !== null && resolved.productIds.length !== 1
+	if (generic) {
+		const match = matchTitle(c.title)
+		if (!match.productId) return { score: 0, reason: "not a recognised device", drop: "mismatch" }
+		const product = PRODUCTS.get(match.productId)!
+		const inBrand = resolved.productIds.length > 0
+			? resolved.productIds.includes(match.productId)
+			: product.category === resolved.category
+		if (!inBrand) return { score: 0, reason: "not what you asked for", drop: "mismatch" }
+		const refurb = isRefurbished(c.title) && !isRefurbished(want.query)
+		return { score: refurb ? 0.65 : 0.9, reason: refurb ? "refurbished or used, not new" : `matches: ${product.model}` }
 	}
 	const share = (words: string[]): number =>
 		words.length === 0 ? 0 : words.filter((word) => hasWord(title, word)).length / words.length

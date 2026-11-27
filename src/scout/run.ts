@@ -1,5 +1,6 @@
 // Query → scouts → judge → rank → verify, with live partial results and a short cache.
 
+import { resolveQuery } from "../search/matcher"
 import { judge } from "./judge"
 import { buildQueries, fold, siteFits } from "./query"
 import { filterRange, rank, toSlots } from "./rank"
@@ -148,7 +149,8 @@ async function buildResult(
 	if (finish.verify) emit(deps, "judge", "start", `${range.kept.length} candidates`)
 	const verdict = await judge(want, range.kept, deps.llmJudge)
 	if (finish.verify) emit(deps, "judge", "done", `${verdict.judged.length} judged`)
-	const ranked = rank(verdict.judged)
+	const { productIds, category } = resolveQuery(want.query)
+	const ranked = rank(verdict.judged, { bySpec: category !== null && productIds.length !== 1 })
 	const slots = toSlots(ranked.ordered)
 	const trace: ScoutTrace[] = [...range.dropped, ...verdict.dropped, ...ranked.dropped]
 	let best = slots.best

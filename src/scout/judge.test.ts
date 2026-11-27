@@ -121,3 +121,29 @@ test("a variant the user didn't name and a refurbished unit rank under the exact
 	assert.equal(judgeOffline(want({ query: "iPhone 15 Plus" }), cand("Apple iPhone 15 Plus 128GB")).score, 1)
 	assert.equal(judgeOffline(want({ query: "refurbished iPhone 15" }), cand("Refurbished iPhone 15 128GB")).score, 1)
 })
+
+test("a generic category query matches devices by model and drops other categories", () => {
+	const phone = judgeOffline(want({ query: "telefon" }), cand("Apple iPhone 15 128GB Black"))
+	assert.equal(phone.drop, undefined)
+	assert.equal(phone.score, 0.9)
+	assert.equal(phone.reason, "matches: iPhone 15")
+
+	const laptop = judgeOffline(want({ query: "telefon" }), cand("MacBook Air M3 512GB"))
+	assert.equal(laptop.drop, "mismatch")
+	assert.equal(laptop.reason, "not what you asked for")
+
+	const unrecognised = judgeOffline(want({ query: "telefon" }), cand("Random thing"))
+	assert.equal(unrecognised.drop, "mismatch")
+})
+
+test("a brand query keeps only that brand's devices", () => {
+	assert.equal(judgeOffline(want({ query: "iphone" }), cand("Apple iPhone 15 128GB Black")).drop, undefined)
+	assert.equal(judgeOffline(want({ query: "iphone" }), cand("Samsung Galaxy S24 128GB")).drop, "mismatch")
+})
+
+test("for a generic query a refurbished device scores under a new one", () => {
+	const newPhone = judgeOffline(want({ query: "telefon" }), cand("Apple iPhone 15 128GB Black"))
+	const refurb = judgeOffline(want({ query: "telefon" }), cand("Refabrikovani Apple iPhone 15 128GB"))
+	assert.equal(newPhone.score, 0.9)
+	assert.equal(refurb.score, 0.65)
+})
