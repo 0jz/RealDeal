@@ -1,7 +1,7 @@
 import { pickCategory } from "../sources/categories"
-import { customerFetch } from "../sources/customer"
+import { customerFetch, isBackedOff } from "../sources/customer"
 import { filterCards, parseEponudaCards } from "../sources/eponuda"
-import type { ScoutCandidate, ShopScout } from "./types"
+import { ScoutBlocked, type ScoutCandidate, type ShopScout } from "./types"
 
 type FetchPage = (url: string, opts?: { fresh?: boolean }) => Promise<string | null>
 type ImageLd = string | { url?: string }
@@ -10,6 +10,13 @@ type ProductLd = { "@type"?: string | string[]; name?: string; image?: ImageLd |
 
 const ORIGIN = "https://www.eponuda.com"
 const MAX_RESULTS = 8
+
+/** customerFetch returns null both for a missing page and for a challenge; only the challenge (host in cool-down) is a block. */
+async function fetchOrBlocked(fetchPage: FetchPage, url: string): Promise<string | null> {
+	const html = await fetchPage(url)
+	if (html === null && isBackedOff(url)) throw new ScoutBlocked(`eponuda blocked the request: challenge for ${url}`)
+	return html
+}
 
 function ldObjects(value: unknown): Record<string, unknown>[] {
 	if (Array.isArray(value)) return value.flatMap(ldObjects)
@@ -82,7 +89,7 @@ export function createEponudaScout(fetchPage: FetchPage = customerFetch): ShopSc
 		async search(query: string, _range?: Parameters<ShopScout["search"]>[1]): Promise<string[]> {
 			const category = pickCategory(query)
 			if (!category) return []
-			const html = await fetchPage(`${ORIGIN}/${category.eponuda}`)
+			const html = await fetchOrBlocked(fetchPage, `${ORIGIN}/${category.eponuda}`)
 			if (!html) return []
 			const seen = new Set<string>()
 			const urls: string[] = []
@@ -95,7 +102,7 @@ export function createEponudaScout(fetchPage: FetchPage = customerFetch): ShopSc
 			return urls
 		},
 		async read(url: string): Promise<ScoutCandidate | null> {
-			const html = await fetchPage(url)
+			const html = await fetchOrBlocked(fetchPage, url)
 			return html ? parseEponudaProduct(html, url, new Date().toISOString()) : null
 		},
 	}

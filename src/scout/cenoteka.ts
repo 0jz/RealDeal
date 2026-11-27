@@ -1,12 +1,19 @@
 import { pickCategory } from "../sources/categories"
 import { BRAND_TOKENS, filterTiles, parseCenotekaOffers, parseCenotekaTiles, type Offer, type Tile } from "../sources/cenoteka"
-import { customerFetch } from "../sources/customer"
-import type { ScoutCandidate, ShopScout } from "./types"
+import { customerFetch, isBackedOff } from "../sources/customer"
+import { ScoutBlocked, type ScoutCandidate, type ShopScout } from "./types"
 
 type FetchPage = (url: string, opts?: { fresh?: boolean }) => Promise<string | null>
 
 const ORIGIN = "https://cenoteka.rs"
 const MAX_RESULTS = 8
+
+/** customerFetch returns null both for a missing page and for a challenge; only the challenge (host in cool-down) is a block. */
+async function fetchOrBlocked(fetchPage: FetchPage, url: string): Promise<string | null> {
+	const html = await fetchPage(url)
+	if (html === null && isBackedOff(url)) throw new ScoutBlocked(`Cenoteka blocked the request: challenge for ${url}`)
+	return html
+}
 
 function metaContent(html: string, property: string): string | null {
 	const tag = html.match(new RegExp(`<meta\\b[^>]*\\bproperty=["']${property}["'][^>]*>`, "i"))?.[0]
@@ -51,7 +58,7 @@ export function createCenotekaScout(fetchPage: FetchPage = customerFetch): ShopS
 			const paths = brand ? [`/b/${brand[1]}/${category.cenoteka}/`, `/${category.cenoteka}/`] : [`/${category.cenoteka}/`]
 			let tiles: Tile[] = []
 			for (const path of paths) {
-				const html = await fetchPage(`${ORIGIN}${path}`)
+				const html = await fetchOrBlocked(fetchPage, `${ORIGIN}${path}`)
 				if (!html) continue
 				tiles = parseCenotekaTiles(html)
 				if (tiles.length) break
@@ -68,7 +75,7 @@ export function createCenotekaScout(fetchPage: FetchPage = customerFetch): ShopS
 			return urls
 		},
 		async read(url: string): Promise<ScoutCandidate | null> {
-			const html = await fetchPage(url)
+			const html = await fetchOrBlocked(fetchPage, url)
 			return html ? parseCenotekaProduct(html, url, new Date().toISOString()) : null
 		},
 	}
