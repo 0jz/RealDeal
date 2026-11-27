@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { test } from "node:test"
+import { noteBlocked } from "../sources/customer"
+import { ScoutBlocked } from "./types"
 import { createEponudaScout, parseEponudaProduct } from "./eponuda"
 
 const saved = (name: string): string => readFileSync(new URL(`../../data/pages/eponuda/${name}`, import.meta.url), "utf8")
@@ -90,4 +92,17 @@ test("read uses the injected fetcher for the product page", async () => {
 	assert.deepEqual(asked, [productUrl])
 	assert.equal(candidate?.price, 44900)
 	assert.ok(candidate?.checkedAt)
+})
+
+test("an empty page without a challenge is not a block", async () => {
+	const scout = createEponudaScout(async () => null)
+	assert.deepEqual(await scout.search("laptop", {}), [])
+})
+
+// Last in the file: noteBlocked puts the host in a 10-minute cool-down for this process.
+test("a challenged host makes the scout report blocked, not an empty ok", async () => {
+	noteBlocked("https://www.eponuda.com/laptopovi-cene")
+	const scout = createEponudaScout(async () => null)
+	await assert.rejects(scout.search("laptop", {}), ScoutBlocked)
+	await assert.rejects(scout.read(productUrl), ScoutBlocked)
 })
