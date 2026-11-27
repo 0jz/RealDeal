@@ -33,6 +33,7 @@ const act = (v: FinanceView, command: Command) => commandGoal(v.id, { revision: 
 
 test("native Mozaik loops publish intermediate plans and reach the expected outcome", async () => {
 	const created = createGoal(EXAMPLE_GOAL)
+	assert.ok(Number.isFinite(created.nowMs), "snapshot has a finite server clock")
 	const intermediate: FinanceView[] = []
 	const off = subscribeGoal(created.id, v => intermediate.push(v))
 	const v = await settled(created.id); off()

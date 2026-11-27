@@ -19,7 +19,7 @@ const LANES = [
 const queuedAt = (r: AgentRun) => (r as AgentRun & { queuedMs?: number }).queuedMs ?? r.startMs
 const fmt = (ms: number) => ms < 1000 ? `${Math.max(0, ms).toFixed(1)} ms` : `${(ms / 1000).toFixed(1)} s`
 
-export function AgentBars({ runs, live = false, picker = false }: { runs: AgentRun[]; live?: boolean; picker?: boolean }) {
+export function AgentBars({ runs, live = false, picker = false, serverNow }: { runs: AgentRun[]; live?: boolean; picker?: boolean; serverNow?: number }) {
 	const reduce = useReducedMotion()
 	const [cycle, setCycle] = useState<number | null>(null)
 	const [clock, setClock] = useState(() => ({ runs, clientAt: performance.now(), frame: performance.now() }))
@@ -45,7 +45,7 @@ export function AgentBars({ runs, live = false, picker = false }: { runs: AgentR
 
 	const start = shown.length ? Math.min(...shown.map(queuedAt)) : 0
 	const serverMax = runs.length ? Math.max(...runs.flatMap(r => [r.startMs, r.endMs ?? r.startMs, queuedAt(r)])) : 0
-	const now = serverMax + Math.max(0, clock.frame - clock.clientAt)
+	const now = (serverNow ?? serverMax) + Math.max(0, clock.frame - clock.clientAt)
 	const finish = shown.length ? Math.max(...shown.map(r => r.status === "running" ? now : r.endMs ?? r.startMs)) : 0
 	const rawSpan = finish - start
 	const span = Math.max(1, rawSpan)

@@ -136,7 +136,11 @@ const runner: InferenceRunner = {
 	async *stream() { throw new Error("Streaming is not used by financial loops") },
 }
 
-function snapshot(s: Session) { return structuredClone(s.view) }
+function snapshot(s: Session) {
+	const view = structuredClone(s.view)
+	view.nowMs = performance.now()
+	return view
+}
 function notify(s: Session) {
 	s.view.sequence++
 	s.view.updatedAt = new Date().toISOString()

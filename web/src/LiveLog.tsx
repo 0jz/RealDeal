@@ -135,7 +135,7 @@ export function LiveLog({ view }: { view: FinanceView }) {
 		transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
 	>
 		<StatusRow view={view} />
-		<AgentBars runs={view.runs} live />
+		<AgentBars runs={view.runs} live serverNow={view.nowMs} />
 		<p className="m-0 font-mono text-xs text-[var(--log-dim)]" aria-live="polite">{done ? "All checks finished. Opening your plan." : "waiting for the agents…"}</p>
 	</motion.section>
 }
@@ -159,7 +159,7 @@ export function PlanDetails({ view, understood }: { view: FinanceView; understoo
 				<h2 className="m-0">How the agents checked this plan</h2>
 				<div className={`${dark} grid gap-4 px-4 py-4`}>
 					<StatusRow view={view} />
-					<AgentBars runs={view.runs} picker />
+					<AgentBars runs={view.runs} picker serverNow={view.nowMs} />
 					<LogLines view={view} />
 				</div>
 				<h3 className="m-0">What changed</h3>

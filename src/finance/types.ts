@@ -94,6 +94,9 @@ export type FinanceView = {
 	scouts?: Record<string, ScoutResult>
 	/** Per wish id: what the scouts look for. Set for plans made from a prompt. */
 	scoutWants?: Record<string, ScoutWant>
+	/** Server's performance.now() when this snapshot was taken, so clients can keep
+	 * counting between views instead of snapping back to the last event time. */
+	nowMs?: number
 }
 export type Command =
 	| { type: "refresh" }
