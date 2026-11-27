@@ -8,7 +8,7 @@ const TIMEOUT_MS = 15_000
 const MAX_RETRIES = 3
 const DEFAULT_INTERVAL_MS = 2_000
 
-class HttpError extends Error {
+export class HttpError extends Error {
 	constructor(
 		readonly status: number,
 		url: string,
@@ -40,33 +40,35 @@ function enqueue<T>(host: string, minIntervalMs: number, fn: () => Promise<T>): 
 	return run
 }
 
-type Attempt = { ok: true; body: string } | { ok: false; retry: boolean; error: Error }
+/** How a URL is actually fetched. The default is Node's fetch; adapters on hosts
+ * whose WAF blocks Node's TLS profile can pass the OS curl instead (see customer.ts). */
+export type Transport = (url: string, headers: Record<string, string>) => Promise<string>
 
-async function attemptOnce(url: string): Promise<Attempt> {
-	try {
-		const res = await fetch(url, {
-			headers: { "user-agent": USER_AGENT, accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5" },
-			signal: AbortSignal.timeout(TIMEOUT_MS),
-		})
-		if (res.ok) return { ok: true, body: await res.text() }
-		return { ok: false, retry: res.status === 429 || res.status >= 500, error: new HttpError(res.status, url) }
-	} catch (err) {
-		return { ok: false, retry: true, error: err instanceof Error ? err : new Error(String(err)) }
-	}
+export const nodeTransport: Transport = async (url, headers) => {
+	const res = await fetch(url, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) })
+	if (res.ok) return await res.text()
+	throw new HttpError(res.status, url)
 }
 
-async function getWithRetry(url: string): Promise<string> {
+async function getWithRetry(
+	url: string,
+	headers: Record<string, string> = { "user-agent": USER_AGENT, accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5" },
+	transport: Transport = nodeTransport,
+): Promise<string> {
 	for (let attempt = 0; ; attempt++) {
-		const out = await attemptOnce(url)
-		if (out.ok) return out.body
-		if (!out.retry || attempt >= MAX_RETRIES) throw out.error
-		await sleep(1000 * 2 ** attempt)
+		try {
+			return await transport(url, headers)
+		} catch (err) {
+			const retryable = !(err instanceof HttpError) || err.status === 429 || err.status >= 500
+			if (!retryable || attempt >= MAX_RETRIES) throw err
+			await sleep(1000 * 2 ** attempt)
+		}
 	}
 }
 
-async function fetchRobots(origin: string): Promise<string> {
+async function fetchRobots(origin: string, headers?: Record<string, string>, transport?: Transport): Promise<string> {
 	try {
-		return await getWithRetry(`${origin}/robots.txt`)
+		return await getWithRetry(`${origin}/robots.txt`, headers, transport)
 	} catch (err) {
 		// No robots.txt means no restrictions. Anything else (401, 403, outage) blocks the host for now.
 		if (err instanceof HttpError && (err.status === 404 || err.status === 410)) return ""
@@ -74,26 +76,42 @@ async function fetchRobots(origin: string): Promise<string> {
 	}
 }
 
-function getRobots(origin: string): Promise<string> {
-	let robots = robotsCache.get(origin)
+function getRobots(origin: string, headers?: Record<string, string>, transport?: Transport): Promise<string> {
+	// Per profile: a host that challenges the honest bot UA may still answer a customer UA (measured on eponuda).
+	const key = `${origin}|${headers?.["user-agent"] ?? "bot"}`
+	let robots = robotsCache.get(key)
 	if (!robots) {
-		robots = enqueue(new URL(origin).host, DEFAULT_INTERVAL_MS, () => fetchRobots(origin))
-		robotsCache.set(origin, robots)
-		robots.catch(() => robotsCache.delete(origin)) // try again next time
+		robots = enqueue(new URL(origin).host, DEFAULT_INTERVAL_MS, () => fetchRobots(origin, headers, transport))
+		robotsCache.set(key, robots)
+		robots.catch(() => robotsCache.delete(key)) // try again next time
 	}
 	return robots
 }
 
+export type PoliteOptions = {
+	minIntervalMs?: number
+	fresh?: boolean
+	/** Extra request headers, overriding the defaults. A `user-agent` here replaces the honest bot UA. */
+	headers?: Record<string, string>
+	/** Random extra wait before the request, uniform in [0, jitterMs). Softens request rhythms on hosts that score them. */
+	jitterMs?: number
+	/** How to fetch. Defaults to Node's fetch; see Transport. */
+	transport?: Transport
+}
+
 /** `fresh` skips the cache read (a re-check must see the live page); the result still refreshes the cache. */
-export async function politeFetch(url: string, opts: { minIntervalMs?: number; fresh?: boolean } = {}): Promise<string> {
+export async function politeFetch(url: string, opts: PoliteOptions = {}): Promise<string> {
 	const cached = cache.get(url)
 	if (!opts.fresh && cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.body
 
 	const target = new URL(url)
-	const robots = await getRobots(target.origin)
+	const headers = { "user-agent": USER_AGENT, accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5", ...opts.headers }
+	const robots = await getRobots(target.origin, headers, opts.transport)
 	if (!isAllowedByRobots(robots, target.pathname + target.search)) throw new Error(`blocked by robots.txt: ${url}`)
-
-	const body = await enqueue(target.host, opts.minIntervalMs ?? DEFAULT_INTERVAL_MS, () => getWithRetry(url))
+	const body = await enqueue(target.host, opts.minIntervalMs ?? DEFAULT_INTERVAL_MS, async () => {
+		if (opts.jitterMs) await sleep(Math.floor(Math.random() * opts.jitterMs))
+		return getWithRetry(url, headers, opts.transport)
+	})
 	cache.set(url, { at: Date.now(), body })
 	return body
 }
