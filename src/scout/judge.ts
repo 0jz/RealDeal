@@ -1,7 +1,9 @@
 // JudgeAgent: scores candidates against the user's description. Titles are data, never instructions.
 
-import { ACCESSORY } from "../search/matcher"
-import { fold } from "./query"
+import { ACCESSORY, resolveQuery } from "../search/matcher"
+import { fold, genericCategory } from "./query"
+import { pickCategory } from "../sources/categories"
+import { CATEGORY_WORDS } from "../search/catalogue"
 import type { ScoutCandidate, ScoutTrace, ScoutWant } from "./types"
 
 export type Judged = ScoutCandidate & { score: number; reason: string }
@@ -19,6 +21,7 @@ function tokens(text: string): string[] {
 /** Four shared leading letters make "jakna" and "jakne" the same word. */
 function same(a: string, b: string): boolean {
 	if (a === b) return true
+	if (/\d/.test(a) || /\d/.test(b)) return false
 	return a.length >= 4 && b.length >= 4 && a.slice(0, 4) === b.slice(0, 4)
 }
 
@@ -59,6 +62,14 @@ export function judgeOffline(want: ScoutWant, c: ScoutCandidate): Verdict {
 	const attributes = want.attributes.flatMap(tokens)
 	if (ACCESSORY.some((phrase) => hasPhrase(title, phrase) && !hasPhrase(query, phrase))) {
 		return { score: 0, reason: "an accessory, not the item", drop: "accessory" }
+	}
+	const generic = genericCategory(want.query)
+	if (generic) {
+		const actual = resolveQuery(c.title).category
+		const expectedPage = pickCategory(CATEGORY_WORDS[generic.category][0])?.cenoteka
+		const actualPage = pickCategory(c.title)?.cenoteka
+		if (actual === generic.category || (!actual && expectedPage && actualPage === expectedPage)) title.push(...generic.words)
+		else if (actual || actualPage) return { score: 0, reason: "another product category", drop: "mismatch" }
 	}
 	const share = (words: string[]): number =>
 		words.length === 0 ? 0 : words.filter((word) => hasWord(title, word)).length / words.length

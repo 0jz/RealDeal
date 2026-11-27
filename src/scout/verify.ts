@@ -30,6 +30,8 @@ export async function verifyListing(l: ScoutListing, deps: VerifyDeps): Promise<
 		fresh = null
 	}
 	if (!fresh) return { ok: false, listing: l, why: PAGE_GONE }
+	if (fresh.inStock === false) return { ok: false, listing: l, why: "out of stock" }
+	if (fresh.delivery !== l.delivery) return { ok: false, listing: l, why: "delivery cost changed; check prices again" }
 	if (fresh.price !== l.price) return { ok: false, listing: l, why: `price changed from ${l.price} to ${fresh.price} RSD` }
 
 	// A broken picture is dropped, never swapped for another listing's picture.

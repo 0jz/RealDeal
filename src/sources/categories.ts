@@ -8,7 +8,7 @@
 // (iphone, rtx…) also pick the category but stay required — that keeps
 // "iphone 15" from matching every phone with a 15 in it.
 
-import { normalize } from "./fixture"
+import { normalize } from "./text"
 
 type CategoryMap = {
 	/** Any token matching this picks the category. */

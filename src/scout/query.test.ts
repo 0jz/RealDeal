@@ -35,3 +35,8 @@ test("clothing and shoes skip the electronics shops but never Ananas or Office S
 	assert.equal(siteFits("ananas", want({ query: "cipele" })), true)
 	assert.equal(siteFits("officeshoes", want({ query: "patike" })), true)
 })
+
+
+test("English categories also search the local shop language without losing model constraints", () => {
+	assert.deepEqual(buildQueries(want({ query: "Samsung phone" })), ["Samsung telefon", "Samsung phone"])
+})

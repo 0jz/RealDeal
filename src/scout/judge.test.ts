@@ -121,3 +121,18 @@ test("a variant the user didn't name and a refurbished unit rank under the exact
 	assert.equal(judgeOffline(want({ query: "iPhone 15 Plus" }), cand("Apple iPhone 15 Plus 128GB")).score, 1)
 	assert.equal(judgeOffline(want({ query: "refurbished iPhone 15" }), cand("Refurbished iPhone 15 128GB")).score, 1)
 })
+
+
+test("generic phone search accepts device models without a category word, but not other devices or accessories", () => {
+	for (const query of ["phone", "telefon", "smartphone"]) {
+		assert.equal(judgeOffline(want({ query }), cand("Samsung Galaxy S24 128GB")).score, 1)
+		assert.equal(judgeOffline(want({ query }), cand("Apple iPhone 15 128GB")).score, 1)
+		assert.equal(judgeOffline(want({ query }), cand("Lenovo ThinkPad laptop")).drop, "mismatch")
+		assert.equal(judgeOffline(want({ query }), cand("Huawei smartwatch")).drop, "mismatch")
+		assert.equal(judgeOffline(want({ query }), cand("Maska Samsung Galaxy S24")).drop, "accessory")
+	}
+})
+
+test("numeric model identifiers never match by a four-letter prefix", () => {
+	assert.equal(judgeOffline(want({ query: "RTX 4060" }), cand("RTX 4061")).drop, "mismatch")
+})

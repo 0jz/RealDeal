@@ -138,3 +138,11 @@ test("toSlots never pads and caps mentions at 7", () => {
 	assert.equal(twelve.mentions.length, 7)
 	assert.equal(twelve.mentions[6].title, "P9")
 })
+
+
+test("budget uses price plus delivery, rejects unavailable or invalid prices, retains unknown delivery explicitly", () => {
+	const items = [cand({ price: 99999, delivery: 2 }), cand({ price: 99500, delivery: 500 }), cand({ price: NaN }), cand({ price: -1 }), cand({ price: 40000, inStock: false }), cand({ price: 50000, delivery: null })]
+	const result = filterRange(items, want({ maxPrice: 100000 }))
+	assert.deepEqual(result.kept.map(c => c.price), [99500, 50000])
+	assert.equal(result.kept[1].delivery, null)
+})

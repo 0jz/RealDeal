@@ -7,6 +7,9 @@ import type { SearchRequest, SearchView } from "./search/types"
 // summary and self-checks; `npm run check -- --log` also prints every event.
 
 const state = startEngine()
+// Keep the complete run: broad budget queries can exceed the runtime UI log ring.
+const log: typeof state.log = []
+state.onRecord(entry => log.push(entry))
 
 const requests: SearchRequest[] = [
 	{ mode: "search", query: "ajfon 15 pro", origin: "check" },
@@ -33,7 +36,6 @@ await Promise.all(
 )
 await new Promise((r) => setTimeout(r, 300)) // let the last handlers settle
 
-const { log } = state
 if (process.argv.includes("--log")) {
 	for (const e of log) console.log(`${String(e.t).padStart(5)}ms  ${(e.searchId ?? "").padEnd(8)} ${e.agent.padEnd(16)} ${e.kind.padEnd(5)} ${e.event}${e.detail ? `  ${e.detail}` : ""}`)
 	console.log()
@@ -85,6 +87,7 @@ const checks: Array<[string, boolean]> = [
 	["misspelled listings found (titles without the literal query)", rows(found).some((r) => !/iphone/i.test(r.title))],
 	["search for 15 Pro returns only iPhone 15 Pro", found.groups.every((g) => g.productId === "iphone-15-pro") && found.groups.length === 1],
 	["look-alikes rejected", found.rejected > 0],
+	["three budget bands each have an in-range recommendation", budget.budgetTiers?.length === 3 && budget.budgetTiers.every(g => g.items.length === 1 && g.items.every(p => p.total >= g.min && p.total <= g.max))],
 	["budget picks exist and every pick ≤ budget", budget.picks.length > 0 && budget.picks.every((p) => p.total <= 100_000)],
 	["sell estimate with a price range", !!sell.sell?.quick && !!sell.sell?.patient && sell.sell.quick <= sell.sell.patient],
 	["every search finished", views.every((v) => v.done)],

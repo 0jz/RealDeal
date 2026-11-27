@@ -282,12 +282,14 @@ export function commandGoal(id: string, input: CommandRequest): FinanceView {
 	if (input.revision !== s.view.revision) throw new Error("The plan changed in the meantime; try again")
 	if (s.view.pending >= 16) throw new Error("Still checking; wait a moment")
 	let reason: string
+	let budgetChanged = false
 	const c = input.command
 	const reanalyze = c.type === "refresh" || c.type === "update-goal"
 	if (c.type === "update-goal") {
 		const goal = validateGoal(c.goal)
 		const l = s.view.ledger
 		if (goal.cash + l.confirmedResale - l.spent - reserved(l) < goal.reserve) throw new Error("Cash can't be lower than what you've already spent and set aside")
+		budgetChanged = goal.cash !== s.view.goal.cash || goal.reserve !== s.view.goal.reserve
 		s.view.goal = goal
 		promoteChosen(s)
 		// Old offers and sale estimates must not be acted on until the new ones are checked.
@@ -302,7 +304,15 @@ export function commandGoal(id: string, input: CommandRequest): FinanceView {
 	recalculate(s, reason)
 	if (reanalyze) for (const role of ROLES.slice(0, 3)) launch(s, role)
 	launch(s, "StrategyAgent")
-	if (c.type === "refresh") scout(s, true)
+	if (budgetChanged && s.view.scoutWants) {
+		const spendable = Math.max(0, s.view.goal.cash - s.view.goal.reserve)
+		for (const want of Object.values(s.view.scoutWants)) {
+			const explicit = want.requestedMaxPrice === null ? Infinity : want.requestedMaxPrice ?? want.maxPrice ?? Infinity
+			want.maxPrice = Math.min(explicit, spendable)
+		}
+		s.view.scouts = {}
+	}
+	if (c.type === "refresh" || budgetChanged) scout(s, true)
 	if (cashBalance(s.view.goal, s.view.ledger) - reserved(s.view.ledger) < s.view.goal.reserve) throw new Error("Internal cash invariant violated")
 	notify(s)
 	return snapshot(s)

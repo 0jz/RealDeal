@@ -16,8 +16,8 @@ export type FixtureOptions = {
 	latencyMs?: [number, number]
 }
 
-/** Lowercase and strip Latin diacritics (č -> c). Cyrillic is left alone on purpose. */
-export const normalize = (s: string) => s.toLowerCase().replace(/đ/g, "d").normalize("NFD").replace(/[̀-ͯ]/g, "")
+import { normalize } from "./text"
+export { normalize } from "./text"
 
 export function createFixtureAdapter(opts: FixtureOptions): SourceAdapter {
 	const pageSize = opts.pageSize ?? 12

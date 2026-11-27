@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { CATALOGUE, PRODUCTS, productName } from "../search/catalogue"
-import { choose } from "./choose"
+import { choose, wishesFromWants } from "./choose"
 import { assessOffers, emptyLedger, estimateResale, matchProduct, optimize } from "./model"
 import type { Goal, Intent } from "./types"
 
@@ -60,4 +60,13 @@ test("an empty prompt throws and unmatched wants are reported", () => {
 	const { goal, uncovered } = choose(intent([phone, { text: "grandma's bike", priority: 2 }]), 100000)
 	assert.deepEqual(uncovered, ["grandma's bike"])
 	assert.equal(goal.wishes.length, 1)
+})
+
+
+test("listing search inherits the total budget minus reserve and caps explicit item limits", () => {
+	const { wants } = wishesFromWants({ ...intent([phone, { text: "laptop", priority: 2, maxPrice: 150000 }]), reserve: 10000 }, 100000)
+	assert.equal(wants.w1.maxPrice, 90000)
+	assert.equal(wants.w2.maxPrice, 90000)
+	assert.equal(wishesFromWants(intent([{ ...phone, maxPrice: 30000, minPrice: 15000 }]), 100000).wants.w1.maxPrice, 30000)
+	assert.equal(wishesFromWants(intent([phone]), 0).wants.w1.maxPrice, 0)
 })

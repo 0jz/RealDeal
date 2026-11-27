@@ -101,12 +101,13 @@ test("a missing scout keeps an off note when one is given", async () => {
 
 test("the time budget stops opening pages and marks the site timeout", async () => {
 	let clockMs = 0
-	const clock = () => (clockMs += 100)
+	const clock = () => clockMs
 	const items = [1, 2, 3, 4, 5].map((i) => cand({ url: `https://ananas.rs/p/${i}`, title: `iPhone 15 ${i}` }))
 	const opened: string[] = []
 	const adapter = scout("ananas", items.map((c) => c.url), mapOf(items), {
 		read: async (url) => {
 			opened.push(url)
+			clockMs += 125
 			return mapOf(items).get(url) ?? null
 		},
 	})
@@ -227,4 +228,51 @@ test("partial results stream before verification and the final result is finishe
 	assert.ok(events.some((e) => e.site === "query" && e.kind === "start"))
 	assert.ok(events.some((e) => e.site === "ananas" && e.kind === "page"))
 	assert.ok(events.some((e) => e.site === "verify" && e.kind === "done"))
+})
+
+
+test("budget tiers survive ranking and verification even with ten cheaper matches", async () => {
+	const items = [10000, 12000, 15000, 16000, 18000, 20000, 22000, 25000, 28000, 30000, 33333, 33334, 66666, 66667, 100000, 100001]
+		.map((price, i) => cand({ title: `iPhone 15 color${i}`, price, delivery: 0 }))
+	items.push(cand({ title: "iPhone 15 sold out", price: 80000, inStock: false }))
+	items.push(cand({ title: "iPhone 15 delivered", price: 99999, delivery: 2 }))
+	const result = await runScouts(want({ maxPrice: 100000 }), deps({ scouts: [scout("ananas", items.map(c => c.url), mapOf(items))], pagesPerSite: 30 }))
+	assert.deepEqual(result.budgetTiers?.map(g => g.items.map(l => l.price)), [[10000, 12000, 15000], [33334, 66666], [66667, 100000]])
+	assert.ok(result.budgetTiers?.every(g => g.items.every(l => l.verified && l.price + (l.delivery ?? 0) >= g.min && l.price + (l.delivery ?? 0) <= g.max)))
+	assert.ok(result.trace.some(t => t.drop === "unavailable"))
+})
+
+test("tier verification replaces a failed top choice within the same band", async () => {
+	const items = [70000, 80000, 90000, 100000].map((price, i) => cand({ title: `iPhone 15 color${i}`, price }))
+	const result = await runScouts(want({ maxPrice: 100000 }), deps({
+		scouts: [scout("ananas", items.map(c => c.url), mapOf(items))],
+		verify: verify({ reread: async l => l.price === 70000 ? null : l }),
+	}))
+	assert.deepEqual(result.budgetTiers?.map(g => g.items.map(l => l.price)), [[], [], [80000, 90000, 100000]])
+})
+
+test("range-aware search gives each tier page slots and honors the user's minimum", async () => {
+	const items = [40000, 50000, 70000, 80000].map(price => cand({ title: `iPhone 15 ${price}`, price }))
+	const ranges: unknown[] = []
+	const adapter = scout("ananas", [], mapOf(items), {
+		supportsPriceRange: true,
+		search: async (_query, range) => {
+			ranges.push(range)
+			return items.filter(c => c.price >= range.minPrice! && c.price <= range.maxPrice!).map(c => c.url)
+		},
+	})
+	const result = await runScouts(want({ minPrice: 35000, maxPrice: 100000 }), deps({ scouts: [adapter], pagesPerSite: 2 }))
+	assert.deepEqual(ranges, [{ minPrice: 35000, maxPrice: 66666 }, { minPrice: 66667, maxPrice: 100000 }])
+	assert.deepEqual(result.budgetTiers?.map(g => g.items.map(l => l.price)), [[], [40000], [70000]])
+})
+
+test("mutating one plan cannot change cached recommendations in another plan", async () => {
+	const item = cand()
+	const d = deps({ scouts: [scout("ananas", [item.url], mapOf([item]))] })
+	const first = await runScouts(want({ maxPrice: 100000 }), d)
+	first.best!.price = 1
+	first.budgetTiers![1].items.length = 0
+	const second = await runScouts(want({ maxPrice: 100000 }), d)
+	assert.equal(second.best?.price, item.price)
+	assert.equal(second.budgetTiers?.[1].items.length, 1)
 })

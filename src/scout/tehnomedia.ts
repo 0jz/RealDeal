@@ -112,6 +112,7 @@ function searchUrl(query: string, range: { minPrice?: number; maxPrice?: number 
 export function createTehnomediaScout(fetchPage: (url: string) => Promise<string> = politeFetch): ShopScout {
 	return {
 		site: "tehnomedia",
+		supportsPriceRange: true,
 		async search(query, range) {
 			return parseTehnomediaSearch(await get(fetchPage, searchUrl(query, range)))
 		},

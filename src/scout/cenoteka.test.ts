@@ -38,7 +38,7 @@ test("search tries the brand category page once and returns /p/ URLs", async () 
 		asked.push(url)
 		return categoryHtml
 	})
-	const urls = await scout.search("iphone 15", { maxPrice: 60000 })
+	const urls = await scout.search("iphone 15", { maxPrice: 200000 })
 	assert.deepEqual(asked, ["https://cenoteka.rs/b/apple/mobilni-telefoni-cene/"])
 	assert.ok(urls.length > 0)
 	assert.ok(urls.every(url => /^https:\/\/cenoteka\.rs\/p\/[^/]+\/$/.test(url)))
@@ -76,4 +76,10 @@ test("read uses the injected fetcher for the product page", async () => {
 	assert.deepEqual(asked, [productUrl])
 	assert.equal(candidate?.price, 159790)
 	assert.ok(candidate?.checkedAt)
+})
+
+
+test("a tiny price limit does not open expensive product pages", async () => {
+	const scout = createCenotekaScout(async () => categoryHtml)
+	assert.deepEqual(await scout.search("telefon", { maxPrice: 1 }), [])
 })

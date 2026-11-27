@@ -135,3 +135,12 @@ test("verifies a batch in parallel and keeps rank order", async () => {
 	assert.equal(most, 3)
 	assert.deepEqual(kept.map((l) => l.url.slice(-1)), ["1", "2", "3"])
 })
+
+
+test("verification rejects unavailable listings and changed delivery costs", async () => {
+	for (const change of [{ inStock: false }, { delivery: 500 }]) {
+		const item = listing(1)
+		const outcome = await verifyListing(item, stubDeps({ reread: async l => ({ ...l, ...change }) }))
+		assert.equal(outcome.ok, false)
+	}
+})

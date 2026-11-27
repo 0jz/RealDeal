@@ -12,6 +12,7 @@ type Judged = ScoutCandidate & { score: number; reason: string }
 
 /** Deterministic range check; no range given → true. */
 export function inRange(price: number, want: Pick<ScoutWant, "minPrice" | "maxPrice">): boolean {
+	if (!Number.isFinite(price) || price <= 0) return false
 	if (want.minPrice !== undefined && price < want.minPrice) return false
 	if (want.maxPrice !== undefined && price > want.maxPrice) return false
 	return true
@@ -22,14 +23,20 @@ export function filterRange(cands: ScoutCandidate[], want: ScoutWant): { kept: S
 	const kept: ScoutCandidate[] = []
 	const dropped: ScoutTrace[] = []
 	for (const c of cands) {
-		if (inRange(c.price, want)) {
+		if (c.inStock === false) {
+			dropped.push({ ...c, score: null, kept: false, why: "out of stock", drop: "unavailable" })
+			continue
+		}
+		const cost = total(c)
+		if (c.price > 0 && (c.delivery === null || c.delivery >= 0) && inRange(cost, want)) {
 			kept.push(c)
 			continue
 		}
 		const why =
-			want.maxPrice !== undefined && c.price > want.maxPrice
-				? `${rsd(c.price)} RSD is over your ${rsd(want.maxPrice)} limit`
-				: `${rsd(c.price)} RSD is under your ${rsd(want.minPrice ?? 0)} minimum`
+			!Number.isFinite(cost) || c.price <= 0 || (c.delivery !== null && c.delivery < 0) ? "invalid price or delivery cost" :
+			want.maxPrice !== undefined && cost > want.maxPrice
+				? `${rsd(cost)} RSD is over your ${rsd(want.maxPrice)} limit`
+				: `${rsd(cost)} RSD is under your ${rsd(want.minPrice ?? 0)} minimum`
 		dropped.push({ ...c, score: null, kept: false, why, drop: "out of range" })
 	}
 	return { kept, dropped }
@@ -91,7 +98,7 @@ function byTotal(a: Judged, b: Judged): number {
 	return a.title < b.title ? -1 : a.title > b.title ? 1 : 0
 }
 
-function total(c: ScoutCandidate): number {
+export function total(c: ScoutCandidate): number {
 	return c.price + (c.delivery ?? 0)
 }
 

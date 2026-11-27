@@ -1,3 +1,4 @@
+import { inRange } from "./rank"
 import { pickCategory } from "../sources/categories"
 import { BRAND_TOKENS, filterTiles, parseCenotekaOffers, parseCenotekaTiles, type Offer, type Tile } from "../sources/cenoteka"
 import { customerFetch } from "../sources/customer"
@@ -44,7 +45,8 @@ export function parseCenotekaProduct(html: string, url: string, now: string): Sc
 export function createCenotekaScout(fetchPage: FetchPage = customerFetch): ShopScout {
 	return {
 		site: "cenoteka",
-		async search(query: string, _range?: Parameters<ShopScout["search"]>[1]): Promise<string[]> {
+		supportsPriceRange: true,
+		async search(query: string, range?: Parameters<ShopScout["search"]>[1]): Promise<string[]> {
 			const category = pickCategory(query)
 			if (!category) return []
 			const brand = BRAND_TOKENS.find(([re]) => category.words.some((w) => re.test(w)))
@@ -59,6 +61,7 @@ export function createCenotekaScout(fetchPage: FetchPage = customerFetch): ShopS
 			const seen = new Set<string>()
 			const urls: string[] = []
 			for (const tile of filterTiles(tiles, query)) {
+				if (!inRange(tile.price, range ?? {})) continue
 				const url = `${ORIGIN}/p/${tile.slug}/`
 				if (seen.has(url)) continue
 				seen.add(url)
