@@ -12,6 +12,8 @@ const LANES = [
 	{ agent: "AnanasScout", color: "var(--log-scout)" },
 	{ agent: "OfficeShoesScout", color: "var(--log-scout)" },
 	{ agent: "GigatronScout", color: "var(--log-scout)" },
+	{ agent: "EponudaScout", color: "var(--log-scout)" },
+	{ agent: "CenotekaScout", color: "var(--log-scout)" },
 	{ agent: "JudgeAgent", color: "var(--log-judge)" },
 	{ agent: "VerifyAgent", color: "var(--log-verify)" },
 ] as const

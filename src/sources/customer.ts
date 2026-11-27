@@ -130,11 +130,13 @@ export function isBackedOff(url: string): boolean {
 	return true
 }
 
-/** A polite fetch that behaves like the customer above: skips a challenged host instead of hammering it. */
-export async function customerFetch(url: string): Promise<string | null> {
+/** A polite fetch that behaves like the customer above: skips a challenged host instead of hammering it.
+ * `fresh` skips the cache so a verify re-check sees the live page. */
+export async function customerFetch(url: string, opts: { fresh?: boolean } = {}): Promise<string | null> {
 	if (isBackedOff(url)) return null
 	try {
 		const html = await politeFetch(url, {
+			fresh: opts.fresh,
 			headers: CUSTOMER_HEADERS,
 			minIntervalMs: CUSTOMER_INTERVAL_MS,
 			jitterMs: CUSTOMER_JITTER_MS,

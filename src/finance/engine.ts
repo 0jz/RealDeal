@@ -314,7 +314,8 @@ let scoutShops = shopDeps
 /** Tests and the offline check swap in stub shops (src/scout/stub.ts) so they never touch the network. */
 export function setScoutShops(deps: typeof shopDeps) { scoutShops = deps }
 
-const SCOUT_AGENT: Record<RunEvent["site"], string> = { query: "QueryAgent", tehnomedia: "TehnomediaScout", ananas: "AnanasScout", officeshoes: "OfficeShoesScout", gigatron: "GigatronScout", judge: "JudgeAgent", verify: "VerifyAgent" }
+// These agent names must stay in sync with the LANES in web/src/AgentBars.tsx.
+const SCOUT_AGENT: Record<RunEvent["site"], string> = { query: "QueryAgent", tehnomedia: "TehnomediaScout", ananas: "AnanasScout", officeshoes: "OfficeShoesScout", gigatron: "GigatronScout", eponuda: "EponudaScout", cenoteka: "CenotekaScout", judge: "JudgeAgent", verify: "VerifyAgent" }
 
 /** Starts one scouting run per wish that came from a prompt. `fresh` drops cached results ("Check prices again"). */
 function scout(s: Session, fresh: boolean) {

@@ -3,17 +3,21 @@
 //
 // Every number here comes from a page a scout fetched during this plan. Nothing is
 // taken from the catalogue (msrp / typicalPrice), which new plans never read.
+// Tehnomedia, Ananas and Office Shoes are shops read directly; eponuda and Cenoteka
+// are comparison sites read through the customer profile (src/sources/customer.ts).
 
-/** Shops the scouts read directly (see docs/LEGAL_REFERENCE.md, "Shops that sell directly"). */
-export type ScoutSite = "tehnomedia" | "ananas" | "officeshoes" | "gigatron"
+/** Sites the scouts can report (see docs/LEGAL_REFERENCE.md). */
+export type ScoutSite = "tehnomedia" | "ananas" | "officeshoes" | "gigatron" | "eponuda" | "cenoteka"
 
-export const SCOUT_SITES: ScoutSite[] = ["tehnomedia", "ananas", "officeshoes", "gigatron"]
+export const SCOUT_SITES: ScoutSite[] = ["tehnomedia", "ananas", "officeshoes", "gigatron", "eponuda", "cenoteka"]
 
 export const SITE_NAMES: Record<ScoutSite, string> = {
 	tehnomedia: "Tehnomedia",
 	ananas: "Ananas",
 	officeshoes: "Office Shoes",
 	gigatron: "Gigatron",
+	eponuda: "eponuda",
+	cenoteka: "Cenoteka",
 }
 
 /** A product as an adapter read it from the shop's own product page. */

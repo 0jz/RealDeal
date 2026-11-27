@@ -86,6 +86,8 @@ test("missing scouts are off, clothing skips electronics, and a challenge blocks
 	assert.equal(result.sites.gigatron.note, "robots changed")
 	assert.equal(result.sites.ananas.status, "off")
 	assert.equal(result.sites.ananas.note, undefined)
+	assert.equal(result.sites.eponuda.status, "off")
+	assert.equal(result.sites.cenoteka.status, "off")
 	assert.equal(result.sites.officeshoes.status, "blocked")
 	assert.equal(result.sites.officeshoes.note, "Office Shoes blocked the request")
 	assert.equal(result.best, null)

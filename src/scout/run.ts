@@ -62,6 +62,8 @@ function emptySites(): Record<ScoutSite, SiteReport> {
 		ananas: { status: "ok", pages: 0, found: 0 },
 		officeshoes: { status: "ok", pages: 0, found: 0 },
 		gigatron: { status: "ok", pages: 0, found: 0 },
+		eponuda: { status: "ok", pages: 0, found: 0 },
+		cenoteka: { status: "ok", pages: 0, found: 0 },
 	}
 }
 

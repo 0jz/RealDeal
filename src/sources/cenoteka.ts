@@ -24,7 +24,7 @@ const ORIGIN = "https://cenoteka.rs"
 const MAX_PRODUCT_FETCHES = 4
 
 /** Term token → the brand slug Cenoteka uses in /b/<brand>/<category>/ URLs. */
-const BRAND_TOKENS: Array<[RegExp, string]> = [
+export const BRAND_TOKENS: Array<[RegExp, string]> = [
 	[/(iphone|ipad|macbook|airpods|apple)/, "apple"],
 	[/(galaxy|samsung)/, "samsung"],
 	[/(redmi|xiaomi|pocophone|poco)/, "xiaomi"],
