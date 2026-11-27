@@ -131,9 +131,16 @@ test("a generic category query matches devices by model and drops other categori
 	const laptop = judgeOffline(want({ query: "telefon" }), cand("MacBook Air M3 512GB"))
 	assert.equal(laptop.drop, "mismatch")
 	assert.equal(laptop.reason, "not what you asked for")
+})
 
-	const unrecognised = judgeOffline(want({ query: "telefon" }), cand("Random thing"))
-	assert.equal(unrecognised.drop, "mismatch")
+test("a device outside the catalogue is kept for a generic query, ranked under catalogue models", () => {
+	const unknownPhone = judgeOffline(want({ query: "telefon" }), cand("Nothing Phone 2 256GB"))
+	assert.equal(unknownPhone.drop, undefined)
+	assert.equal(unknownPhone.score, 0.8)
+
+	const unknownLaptop = judgeOffline(want({ query: "laptop" }), cand("Lenovo IdeaPad Slim 3 15ABR8 16GB"))
+	assert.equal(unknownLaptop.drop, undefined)
+	assert.equal(unknownLaptop.score, 0.8)
 })
 
 test("a brand query keeps only that brand's devices", () => {

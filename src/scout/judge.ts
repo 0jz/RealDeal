@@ -67,15 +67,19 @@ export function judgeOffline(want: ScoutWant, c: ScoutCandidate): Verdict {
 	const generic = resolved.category !== null && resolved.productIds.length !== 1
 	if (generic) {
 		const match = matchTitle(c.title)
-		if (!match.productId) return { score: 0, reason: "not a recognised device", drop: "mismatch" }
-		const product = PRODUCTS.get(match.productId)!
-		// A category word ("phone") matches every device in that category; a brand ("iphone") only its own models.
-		const inScope = isCategoryWord(want.query) || resolved.productIds.length === 0
-			? product.category === resolved.category
-			: resolved.productIds.includes(match.productId)
-		if (!inScope) return { score: 0, reason: "not what you asked for", drop: "mismatch" }
 		const refurb = isRefurbished(c.title) && !isRefurbished(want.query)
-		return { score: refurb ? 0.65 : 0.9, reason: refurb ? "refurbished or used, not new" : `matches: ${product.model}` }
+		if (match.productId) {
+			const product = PRODUCTS.get(match.productId)!
+			// A category word ("phone") matches every device in that category; a brand ("iphone") only its own models.
+			const inScope = isCategoryWord(want.query) || resolved.productIds.length === 0
+				? product.category === resolved.category
+				: resolved.productIds.includes(match.productId)
+			if (!inScope) return { score: 0, reason: "not what you asked for", drop: "mismatch" }
+			return { score: refurb ? 0.65 : 0.9, reason: refurb ? "refurbished or used, not new" : `matches: ${product.model}` }
+		}
+		// Not in the catalogue, but the scout already scoped the search to this category/brand,
+		// so it is a device in scope; it just ranks under catalogue-recognised models.
+		return { score: refurb ? 0.6 : 0.8, reason: refurb ? "refurbished or used, not new" : `matches: ${want.query}` }
 	}
 	const share = (words: string[]): number =>
 		words.length === 0 ? 0 : words.filter((word) => hasWord(title, word)).length / words.length
