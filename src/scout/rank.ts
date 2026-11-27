@@ -99,8 +99,12 @@ function sortRanked(items: Judged[], bySpec = false): Judged[] {
 }
 
 function bySpecThenTotal(a: Judged, b: Judged): number {
-	const d = specOf(b.title) - specOf(a.title)
+	const sa = specOf(a.title)
+	const sb = specOf(b.title)
+	const d = sb - sa
 	if (d !== 0) return d
+	// Both uncatalogued (no device score): a higher price stands in for better specs.
+	if (sa === 0) return total(b) - total(a)
 	return byTotal(a, b)
 }
 

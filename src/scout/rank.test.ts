@@ -148,3 +148,10 @@ test("bySpec orders a score band by device score before price", () => {
 	const byPrice = rank([cheap, good])
 	assert.deepEqual(byPrice.ordered.map((x) => x.title), [cheap.title, good.title])
 })
+
+test("bySpec ranks uncatalogued devices by highest price, not cheapest", () => {
+	const cheap = cand({ title: "Lenovo IdeaPad Slim 3 15ABR8", price: 62000, score: 0.8 })
+	const pricey = cand({ title: "ASUS Vivobook 15 X1504VA", price: 95000, score: 0.8 })
+	const { ordered } = rank([cheap, pricey], { bySpec: true })
+	assert.deepEqual(ordered.map((x) => x.title), [pricey.title, cheap.title])
+})
