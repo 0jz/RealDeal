@@ -147,3 +147,10 @@ test("for a generic query a refurbished device scores under a new one", () => {
 	assert.equal(newPhone.score, 0.9)
 	assert.equal(refurb.score, 0.65)
 })
+
+test("the category word \"phone\" matches any phone, not just iPhones", () => {
+	assert.equal(judgeOffline(want({ query: "phone" }), cand("Samsung Galaxy S24 128GB")).drop, undefined)
+	assert.equal(judgeOffline(want({ query: "phone" }), cand("Google Pixel 9 128GB")).drop, undefined)
+	assert.equal(judgeOffline(want({ query: "New phone" }), cand("Samsung Galaxy S24 128GB")).drop, undefined)
+	assert.equal(judgeOffline(want({ query: "phone" }), cand("MacBook Air M3 512GB")).drop, "mismatch")
+})

@@ -84,3 +84,17 @@ export const CATEGORY_WORDS: Record<Category, string[]> = {
 	gpu: ["graficka", "graficka karta", "gpu", "grafika"],
 	watch: ["sat", "pametni sat", "smartwatch"],
 }
+
+/** True when any word of the query is a category word ("telefon", "laptop", "phone"), not a brand or model. */
+export const isCategoryWord = (query: string): boolean => {
+	const words = query
+		.toLowerCase()
+		.normalize("NFD")
+		.replace(/[\u0300-\u036f]/g, "")
+		.replace(/đ/g, "dj")
+		.replace(/[^a-z0-9]+/g, " ")
+		.split(/\s+/)
+		.filter(Boolean)
+	const flat = Object.values(CATEGORY_WORDS).flat()
+	return words.some((w) => flat.includes(w))
+}
