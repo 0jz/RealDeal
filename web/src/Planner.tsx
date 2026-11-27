@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import type { Asset, Command, FinanceView, Goal, Intent, Wish } from "../../src/finance/types"
 import { motion, useReducedMotion } from "motion/react"
 import { toast } from "sonner"
@@ -8,20 +8,13 @@ import { isRefurbished } from "../../src/scout/judge"
 import { Toaster } from "./components/ui/sonner"
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "./components/ui/dialog"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./components/ui/collapsible"
-import { Landing, SiteNav } from "./Landing"
-import { BarcodeScanner } from "./BarcodeScanner"
+import { focusAsk, Landing, SiteNav } from "./Landing"
+import { AskBox } from "./AskBox"
 import { blankDraft, CommandError, followPlan, FinanceForm, planIdFromUrl, priceLabel, TrackPanel, rsd, sendCommand, setPlanInUrl, toDraft, type Draft, type Product } from "./Finance"
 
-const MAX_CHARS = 1000
-const WARN_CHARS = 800
 const MAX_RSD = 10_000_000
-/** The prompt page. The server and Vite both serve index.html for it. */
-export const ASK_PATH = "/new"
-const EXAMPLES = [
-	"New phone for 75000 RSD. I can sell my iPhone 13, it's in good shape.",
-	"Hoću iPhone 15 za 85k, prodajem stari ajfon 13",
-	"Laptop do 100 hiljada",
-]
+/** The prompt lives on the front page now. "/new" is still accepted and scrolls to it. */
+export const ASK_PATH = "/"
 
 /** What the server said it could not match. Rendered as text only. */
 type Miss = { message: string; unknown: string[] }
@@ -105,6 +98,11 @@ export function Planner() {
 		requestAnimationFrame(() => document.getElementById("plan-headline")?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }))
 	}, [phase])
 
+	// Old links to /new land on the prompt in the front page hero. A /new?plan=<id> link opens its plan instead.
+	useEffect(() => {
+		if (!loading && location.pathname === "/new" && !planIdFromUrl()) focusAsk()
+	}, [loading])
+
 	/** Sends a change to the open plan. The draft follows the goal the server accepted. */
 	async function send(cmd: Command): Promise<boolean> {
 		if (!view) return false
@@ -139,43 +137,12 @@ export function Planner() {
 
 	const picks = view ? picksOf(view) : []
 
-	const onPromptKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void plan() }
-	}
-
 	if (loading) return <main className="page"><p className="note">Opening your plan…</p></main>
 
 	const checking = phase === "checking"
 
-	// The front page is "/". The prompt page with the test prompts is ASK_PATH; a broken plan link also lands there to show its error.
-	if (!view && location.pathname !== ASK_PATH && !error) return <Landing />
-
-	if (!view || checking) return <main className="page ask-page">
-		<section className="ask" aria-labelledby="ask-title">
-			<p className="brand"><a href="/">RealDeal</a></p>
-			<h1 id="ask-title">What do you want to buy or sell?</h1>
-			<div className="ask-box">
-				<label className="field"><span className="sr-only">Describe what you want to buy or sell</span>
-					<textarea value={text} maxLength={MAX_CHARS} rows={1} placeholder="e.g. New phone for 75000 RSD. I can sell my old iPhone 13." aria-describedby="ask-count" onChange={e => setText(e.target.value)} onKeyDown={onPromptKey} readOnly={checking} />
-				</label>
-				<div className="ask-foot">
-					<span id="ask-count" className={text.length >= WARN_CHARS ? "counter near" : "counter"} aria-live="polite">{text.length >= WARN_CHARS ? `${text.length}/${MAX_CHARS}` : ""}</span>
-					<button type="button" className="primary" disabled={busy || checking || !text.trim()} onClick={() => void plan()}>{busy || checking ? "Checking…" : "Make my plan"}</button>
-				</div>
-			</div>
-			{!checking && <BarcodeScanner disabled={busy} remaining={MAX_CHARS - text.length - (text.trim() ? 2 : 0)} onUse={product => setText(current => {
-				const previous = current.trim()
-				const separator = previous ? /[.!?;]$/.test(previous) ? "\n" : ".\n" : ""
-				return `${previous}${separator}I want ${product.title}.`
-			})} />}
-			{miss && <p className="alert" role="alert">{miss.unknown.length ? `I couldn't match: ${miss.unknown.join(", ")}` : miss.message}</p>}
-			{error && <p className="alert" role="alert">{error}</p>}
-			{!checking && <div className="examples">
-				<p className="label">Or try one of these</p>
-				<ul>{EXAMPLES.map(ex => <li key={ex}><button type="button" onClick={() => setText(ex)}>{ex}</button></li>)}</ul>
-			</div>}
-		</section>
-	</main>
+	// Without a plan (and while one is being checked) the front page shows the prompt in its hero. A broken plan link lands here too, with its error above the prompt.
+	if (!view || checking) return <Landing ask={<AskBox text={text} setText={setText} busy={busy} checking={checking} miss={miss} error={error} onPlan={() => void plan()} />} />
 
 	const alternativesFor = (wish: Wish) => (kept?.alternatives[wish.id] ?? [])
 		.map(id => catalogue.find(p => p.id === id))
