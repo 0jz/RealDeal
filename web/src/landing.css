@@ -34,12 +34,6 @@
 .site-btn { display: inline-block; padding: 11px 20px; border-radius: 10px; border: 1px solid #475569; color: #fff; font-weight: 600; text-decoration: none; transition: transform 120ms ease-out; }
 .site-btn:active { transform: scale(0.97); }
 .site-btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.site-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
-.site-stat { background: var(--night-sheet); border: 1px solid var(--night-rule); border-radius: 14px; padding: 16px; }
-.site-stat-v { font-size: 28px; font-weight: 800; white-space: nowrap; } .site-stat-v span { font-size: 16px; color: var(--night-muted); font-weight: 500; }
-.site-stat-v.green { color: #86efac; }
-.site-stat-l { color: var(--night-muted); font-size: 13px; margin-top: 4px; }
-.site-hero-foot { color: var(--night-muted); font-size: 13px; margin-top: 14px; }
 .site-hero a:not(.site-btn) { color: var(--accent-soft); }
 
 .site-wrap { max-width: 1160px; margin: 0 auto; padding: 0 var(--gutter); }
@@ -56,11 +50,6 @@
 .site-footer { padding: 48px var(--gutter) 48px; color: var(--muted); font-size: 13px; display: grid; gap: 6px; }
 
 @media (max-width: 900px) {
-	.site-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	.site-nav nav { display: none; }
 	.site-hero { padding-top: 36px; }
-}
-@media (max-width: 420px) {
-	.site-stat-v { font-size: 19px; }
-	.site-stat { padding: 14px 12px; }
 }

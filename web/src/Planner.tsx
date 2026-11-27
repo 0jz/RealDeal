@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, 
 import type { Asset, Command, FinanceView, Goal, Intent, Wish } from "../../src/finance/types"
 import { motion, useReducedMotion } from "motion/react"
 import { toast } from "sonner"
-import { LiveLog, PlanDetails, settled } from "./LiveLog"
+import { PlanDetails, settled } from "./LiveLog"
 import { BestPick } from "./BestPick"
 import { isRefurbished } from "../../src/scout/judge"
 import { Toaster } from "./components/ui/sonner"
@@ -170,7 +170,6 @@ export function Planner() {
 			})} />}
 			{miss && <p className="alert" role="alert">{miss.unknown.length ? `I couldn't match: ${miss.unknown.join(", ")}` : miss.message}</p>}
 			{error && <p className="alert" role="alert">{error}</p>}
-			{view && checking && <LiveLog view={view} />}
 			{!checking && <div className="examples">
 				<p className="label">Or try one of these</p>
 				<ul>{EXAMPLES.map(ex => <li key={ex}><button type="button" onClick={() => setText(ex)}>{ex}</button></li>)}</ul>
