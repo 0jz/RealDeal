@@ -9,6 +9,7 @@ import { Toaster } from "./components/ui/sonner"
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "./components/ui/dialog"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./components/ui/collapsible"
 import { Landing, SiteNav } from "./Landing"
+import { BarcodeScanner } from "./BarcodeScanner"
 import { blankDraft, CommandError, followPlan, FinanceForm, planIdFromUrl, priceLabel, TrackPanel, rsd, sendCommand, setPlanInUrl, toDraft, type Draft, type Product } from "./Finance"
 
 const MAX_CHARS = 1000
@@ -162,6 +163,11 @@ export function Planner() {
 					<button type="button" className="primary" disabled={busy || checking || !text.trim()} onClick={() => void plan()}>{busy || checking ? "Checking…" : "Make my plan"}</button>
 				</div>
 			</div>
+			{!checking && <BarcodeScanner disabled={busy} remaining={MAX_CHARS - text.length - (text.trim() ? 2 : 0)} onUse={product => setText(current => {
+				const previous = current.trim()
+				const separator = previous ? /[.!?;]$/.test(previous) ? "\n" : ".\n" : ""
+				return `${previous}${separator}I want ${product.title}.`
+			})} />}
 			{miss && <p className="alert" role="alert">{miss.unknown.length ? `I couldn't match: ${miss.unknown.join(", ")}` : miss.message}</p>}
 			{error && <p className="alert" role="alert">{error}</p>}
 			{view && checking && <LiveLog view={view} />}
