@@ -40,3 +40,81 @@ Checked November 26, 2026 (step 0 of `docs/SCOUTS_PROMPT.md`), with the same hon
 ## Result
 
 Neither site passed the gate, so the build stopped at step 0, as the prompt says. No pages were saved to `data/pages/`.
+
+# Shops that sell directly: gate check
+
+Checked November 26, 2026, after eponuda and Cenoteka failed, with the same honest User-Agent (`RealDealBot/0.1`). Goal: shops whose own pages we can read for exact price, picture and listing link.
+
+## Blocked for our fetcher (Cloudflare challenge or no answer)
+
+tehnomanija.rs, emmi.rs, bcgroup-online.com and lcwaikiki.rs return a `cf-mitigated: challenge`. nsport.rs didn't respond. Off, for the same reason as eponuda.
+
+## robots.txt disallows the search path
+
+| Shop | Disallowed |
+|---|---|
+| winwin.rs | `/catalogsearch/`, `/search/` |
+| djaksport.com, fashionandfriends.com, planetasport.rs | `/catalogsearch/` |
+| buzzsneakers.rs, sportvision.rs | `/*?search=` |
+| deichmann.com | `/search?q=` |
+| shoppster.rs | `/search/*` |
+
+Off. A Gigatron-style sitemap reader could work for some of them, but their terms were not read. Not part of this build.
+
+## Readable, but the terms restrict use
+
+- **Dr Techno (drtechno.rs).** Search `/search/<q>` is server-rendered and allowed by robots. robots.txt also carries `Content-Signal: search=yes, ai-train=no, use=reference`. The terms say all information on the site is informational only and may not be used commercially or passed on to third parties. **Off.**
+- **Intersport / N Sport (intersport.rs).** Search works (`index.php?mod=catalog&op=thm_search&keywords=<q>`). Terms articles 29–30 claim exclusive copyright over the whole service, data and databases included, and treat any use without prior written permission as infringement. **Off.**
+
+## Passed
+
+| Shop | Sells | Search URL | Terms |
+|---|---|---|---|
+| **Tehnomedia** (tehnomedia.rs) | electronics, home appliances | `/search/find.html?rec=<q>` | Terms of use read: no clause on automated reading, copying or databases found. |
+| **Ananas** (ananas.rs) | marketplace: everything, clothing included | `/search?query=<q>` (robots disallows `/api/`, `/app2/api/`, `/en/`, `/sr/`, so the HTML search page, not the API) | No explicit scraping ban. "Zabrana zloupotrebe Platforme" forbids interfering with security functions or with functions that prevent or limit copying; we bypass nothing. The body of the "Zaštita autorskog prava" section was not captured; read it before any public use. |
+| **Office Shoes** (officeshoes.rs) | shoes, clothing | POST `/products/search` with `q=` redirects to a GET listing URL with `?q=`; use that GET form | robots.txt empty. Purchase terms only; no clause on automated reading or content use found. |
+| **Gigatron** (gigatron.rs) | electronics | existing sitemap + JSON-LD adapter (search is robots-disallowed) | Personal, non-commercial use only (see above). |
+
+"Passed" means no robots or terms clause forbids a polite reader, not a legal opinion. All four are fine for the research prototype and the pitch demo. Before RealDeal is offered publicly or commercially, ask each shop (Gigatron's terms already require that), and re-read Ananas's copyright section.
+
+# Electronics shops from the Cenoteka and eponuda lists: gate check
+
+Checked November 27, 2026, with the same honest User-Agent (`RealDealBot/0.1`): one robots.txt, one homepage and one search for "laptop" per shop, then the terms pages linked from the homepage. Domains come from Cenoteka's outgoing shop links. The shop lists are in `docs/SHOP_LISTS.md`.
+
+## Blocked for our fetcher
+
+- **Cloudflare challenge:** gamecentar.rs, imikom.com. Off, as with eponuda.
+- **No answer:** pcpractic.rs (homepage 404). pccool.rs loads its homepage, but its search (`/search/<q>/0`) timed out twice.
+
+## robots.txt disallows the search path
+
+| Shop | Disallowed |
+|---|---|
+| jakov.rs | `/pretraga-proizvoda/` |
+| eklik.rs | `/search` |
+| eplaneta.rs | `/rezultati-pretrage/` |
+| soping.rs | `/pretraga` (our robots check) |
+| shoptogo.rs | `/catalogsearch/` |
+| oblivion.rs | `?s=` search (our robots check) |
+
+Off.
+
+## Readable, but the terms restrict use
+
+- **GStore (gstore.rs).** The terms claim copyright on all content, databases included, and call any unauthorised use of any part of the portal an infringement. **Off.**
+- **Stamteh (stamteh.rs).** "Legal info": you agree not to reproduce, distribute or exploit the site's content for any commercial purpose. **Off.**
+- **ComputerLand (computerland.rs).** The terms forbid "using specialised programs to download content from the site or app". **Off.**
+- **Tempo Tehnika (tempo-tehnika.rs).** "Visual content may not be used without prior consent." Results need the picture. **Off.**
+
+## Passed
+
+| Shop | Search URL | Prices in the HTML | Terms |
+|---|---|---|---|
+| **Laptop Centar** (laptopcentar.rs) | `/search/<q>/0` (a broad word like "laptop" redirects to the category) | yes, `57.989,00 din` | Opšti uslovi poslovanja read: the only copying ban is about the user account, not the site content. |
+| **SMB Tehno** (smbtehno.rs) | `/products/?search=<q>` | yes, `product-card-price` "225950.00 RSD" | Terms of use read: no clause on automated reading or content use. |
+| **Next Computers** (nextcomputers.rs) | `/proizvodi/pretraga?q=<q>` | yes | Uslovi korišćenja read: no such clause. robots.txt blocks AI crawlers (ClaudeBot, CCBot, Bytespider and others) by name, but not other bots. |
+| **Frog** (frog.rs) | `/pretraga/<q>` | yes, `393.920 RSD` | Uslovi korišćenja read: no such clause. |
+| **Overnight** (overnight.rs) | `/pretraga-proizvoda?q=<q>` | in the page's Inertia JSON (`data-page` → `props.products`), not in the HTML | Only purchase and delivery terms found; no general terms of use. |
+| **DS Market** (dsmarket.rs) | `/results,1-40?search=true&keyword=<q>` | yes, `2.111,11 RSD` | No terms page found from the homepage. Find and read it before building the adapter. |
+
+Same caveat as above: "passed" is not a legal opinion. None of these adapters is built yet.

@@ -4,14 +4,18 @@ import { randomUUID } from "node:crypto"
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { commandGoal, createGoal, createGoalFromPrompt, EXAMPLE_GOAL, subscribeGoal } from "./engine"
+import { commandGoal, createGoal, createGoalFromPrompt, EXAMPLE_GOAL, setScoutShops, subscribeGoal } from "./engine"
+import { stubShops } from "../scout/stub"
 import type { Command, FinanceView } from "./types"
 
 process.env.REALDEAL_SESSIONS = await mkdtemp(join(tmpdir(), "realdeal-check-"))
+// Offline: stand-in shops, so the check never touches the network.
+setScoutShops(stubShops(39_999))
 const wait = (id: string) => new Promise<FinanceView>((resolve, reject) => {
 	let off = () => {}
 	const timer = setTimeout(() => { off(); reject(new Error("Analysis exceeded 45 seconds")) }, 45000)
-	off = subscribeGoal(id, v => { if (!v.pending) { queueMicrotask(off); clearTimeout(timer); resolve(v) } })
+	const done = (v: FinanceView) => !v.pending && Object.keys(v.scoutWants ?? {}).every(w => (v.scouts?.[w]?.finishedAt ?? "") !== "")
+	off = subscribeGoal(id, v => { if (done(v)) { queueMicrotask(off); clearTimeout(timer); resolve(v) } })
 })
 const command = (v: FinanceView, command: Command) => commandGoal(v.id, { revision: v.revision, requestId: randomUUID(), command })
 let v = await wait(createGoal(EXAMPLE_GOAL).id)
@@ -38,14 +42,14 @@ const prompt = "New phone for 75000 RSD. I can sell my iPhone 13, it's in good s
 let p = await wait((await createGoalFromPrompt({ prompt })).id)
 const phone = p.goal.wishes[0]
 assert.equal(p.goal.cash, 75000)
-assert.equal(phone.priceSource, "catalogue")
-assert.ok(phone.price <= 75000 && p.plan.complete && p.plan.projectedRemaining >= 0)
-assert.ok(p.intent && p.alternatives?.[phone.id]?.length && !p.alternatives[phone.id].includes("iphone-13"))
-console.log(`PASS prompt "${prompt}" → ${phone.name} at a typical ${phone.price.toLocaleString("sr-RS")} RSD (estimate), ${p.plan.projectedRemaining.toLocaleString("sr-RS")} RSD left`)
-assert.throws(() => command(p, { type: "buy", offerId: phone.id }), /actually paid/)
-p = command(p, { type: "buy", offerId: phone.id, paid: 68000 })
-assert.equal(p.ledger.spent, 68000)
-console.log("PASS buying at an estimated price records what was actually paid, not the estimate")
+assert.equal(phone.priceSource, "listing")
+assert.equal(phone.price, 39999)
+assert.ok(phone.link.startsWith("https://") && p.plan.complete && p.plan.projectedRemaining >= 0)
+assert.ok(p.intent && p.scouts?.[phone.id]?.best?.verified)
+console.log(`PASS prompt "${prompt}" → ${phone.name} at ${phone.shop}, exact listing price ${phone.price.toLocaleString("sr-RS")} RSD, ${p.plan.projectedRemaining.toLocaleString("sr-RS")} RSD left`)
+p = command(p, { type: "buy", offerId: phone.id })
+assert.equal(p.ledger.spent, 39999)
+console.log("PASS buying at a listing price records that exact price")
 await wait(p.id)
 await mkdir("data/out", { recursive: true })
 await writeFile("data/out/finance-evidence.json", JSON.stringify({ view: v }, null, 2))

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react"
 import { AgentBars } from "./AgentBars"
 import type { AgentRun, FinanceView } from "../../src/finance/types"
 
-const AGENTS = ["PurchaseAgent", "ResaleAgent", "ShopTrustAgent", "StrategyAgent", "BudgetGuardian"] as const
+const AGENTS = ["PurchaseAgent", "ResaleAgent", "ShopTrustAgent", "StrategyAgent", "BudgetGuardian", "QueryAgent", "TehnomediaScout", "AnanasScout", "OfficeShoesScout", "GigatronScout", "JudgeAgent", "VerifyAgent"] as const
 type Agent = (typeof AGENTS)[number]
 const COLOR: Record<Agent, string> = {
 	PurchaseAgent: "var(--log-purchase)",
@@ -11,6 +11,13 @@ const COLOR: Record<Agent, string> = {
 	ShopTrustAgent: "var(--log-trust)",
 	StrategyAgent: "var(--log-strategy)",
 	BudgetGuardian: "var(--log-guardian)",
+	QueryAgent: "var(--log-query)",
+	TehnomediaScout: "var(--log-scout)",
+	AnanasScout: "var(--log-scout)",
+	OfficeShoesScout: "var(--log-scout)",
+	GigatronScout: "var(--log-scout)",
+	JudgeAgent: "var(--log-judge)",
+	VerifyAgent: "var(--log-verify)",
 }
 /** What each agent does when it starts. Matches the roles in src/finance/engine.ts. */
 const STARTS: Record<string, string> = {
@@ -18,6 +25,13 @@ const STARTS: Record<string, string> = {
 	ResaleAgent: "valuing what you could sell",
 	ShopTrustAgent: "running the offer risk checks",
 	StrategyAgent: "working out what to buy, sell and wait on",
+	QueryAgent: "turning your words into shop searches",
+	TehnomediaScout: "searching Tehnomedia",
+	AnanasScout: "searching Ananas",
+	OfficeShoesScout: "checking Office Shoes",
+	GigatronScout: "searching Gigatron",
+	JudgeAgent: "scoring listings against what you asked for",
+	VerifyAgent: "re-opening the top listings to confirm price and picture",
 }
 
 type Tone = "run" | "ok" | "stale" | "error"
@@ -50,7 +64,12 @@ function statusOf(agent: Agent, view: FinanceView): Status {
 }
 
 /** True when every agent run has settled. */
-export const settled = (view: FinanceView) => view.pending === 0 && view.runs.length > 0 && view.runs.every(r => r.status !== "running")
+/** The planning agents. Scouts keep running in the background and fill the cards in, so they don't hold the plan back. */
+const PLANNERS = new Set(["PurchaseAgent", "ResaleAgent", "ShopTrustAgent", "StrategyAgent"])
+export const settled = (view: FinanceView) => {
+	const runs = view.runs.filter(r => PLANNERS.has(r.agent))
+	return view.pending === 0 && runs.length > 0 && runs.every(r => r.status !== "running")
+}
 
 const clock = (iso: string) => {
 	const d = new Date(iso)
@@ -124,7 +143,11 @@ export function LiveLog({ view }: { view: FinanceView }) {
 /** After the reveal: a one-line summary that opens what was understood, then how the agents checked it. */
 export function PlanDetails({ view, understood }: { view: FinanceView; understood: ReactNode }) {
 	const [open, setOpen] = useState(false)
-	const summary = `${AGENTS.length - 1} agents checked your plan in ${duration(view.runs)}`
+	// Scouts keep running after the reveal, so say so until every run has ended.
+	const agents = new Set(view.runs.map(r => r.agent)).size
+	const summary = view.runs.some(r => r.status === "running")
+		? `${agents} agents at work: the scouts are still checking the shops`
+		: `${agents} agents checked your plan in ${duration(view.runs)}`
 	return <section aria-label="Plan details" className="overflow-hidden rounded-md border border-[var(--rule)] bg-[var(--sheet)]">
 		<div className={`${dark} flex flex-wrap items-center justify-between gap-3 rounded-none border-0 px-4 py-3 text-sm`}>
 			<span>{summary}</span>

@@ -1,8 +1,10 @@
 import type { Category } from "../search/types"
+import type { ScoutResult, ScoutWant } from "../scout/types"
 
 /** All amounts are integer RSD. Prices come from the user; nothing is bought or sold by the app. */
-/** Where a price came from: the user ("your price") or the catalogue msrp ("typical price (estimate)"). Missing = "you". */
-export type PriceSource = "you" | "catalogue"
+/** Where a price came from: the user ("your price"), the catalogue msrp ("typical price (estimate)", old plans only)
+ * or a listing a scout read ("listing"). Missing = "you". */
+export type PriceSource = "you" | "catalogue" | "listing"
 export type Wish = {
 	id: string; name: string; priority: number
 	/** The offer the user found: price, delivery (null = unknown), shop, optional link. */
@@ -60,6 +62,12 @@ export type AgentRun = {
 /** What a free-text prompt asked for. Structure only: prices are never invented, only read from the prompt. */
 export type IntentWant = {
 	text: string; productId?: string; category?: Category
+	/** What to search for, cleaned of filler and prices: "crna zimska jakna", "iPhone 15 128GB". */
+	query?: string
+	/** Things the result must have: "size M", "black", "128GB", "new". */
+	attributes?: string[]
+	/** "od 50k": a lower limit. */
+	minPrice?: number
 	/** "laptop do 100 hiljada": an upper limit, not a price. */
 	maxPrice?: number
 	/** "iPhone 15 za 85k": the price the user wrote next to the item. */
@@ -82,6 +90,10 @@ export type FinanceView = {
 	intent?: Intent
 	/** Per wish id: other catalogue product ids the user can swap to (same category). */
 	alternatives?: Record<string, string[]>
+	/** Per wish id: what the scouts found. A ?plan= link reopens with these without scouting again. */
+	scouts?: Record<string, ScoutResult>
+	/** Per wish id: what the scouts look for. Set for plans made from a prompt. */
+	scoutWants?: Record<string, ScoutWant>
 }
 export type Command =
 	| { type: "refresh" }

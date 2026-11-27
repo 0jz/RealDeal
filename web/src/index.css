@@ -29,5 +29,9 @@
 	--log-trust: #c4b5fd;
 	--log-strategy: #86efac;
 	--log-guardian: var(--accent);
+	--log-query: #f9a8d4;
+	--log-scout: #67e8f9;
+	--log-judge: #fde68a;
+	--log-verify: #a7f3d0;
 	--log-error: #fca5a5;
 }

@@ -84,9 +84,10 @@ function getRobots(origin: string): Promise<string> {
 	return robots
 }
 
-export async function politeFetch(url: string, opts: { minIntervalMs?: number } = {}): Promise<string> {
+/** `fresh` skips the cache read (a re-check must see the live page); the result still refreshes the cache. */
+export async function politeFetch(url: string, opts: { minIntervalMs?: number; fresh?: boolean } = {}): Promise<string> {
 	const cached = cache.get(url)
-	if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.body
+	if (!opts.fresh && cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.body
 
 	const target = new URL(url)
 	const robots = await getRobots(target.origin)
@@ -95,6 +96,35 @@ export async function politeFetch(url: string, opts: { minIntervalMs?: number } 
 	const body = await enqueue(target.host, opts.minIntervalMs ?? DEFAULT_INTERVAL_MS, () => getWithRetry(url))
 	cache.set(url, { at: Date.now(), body })
 	return body
+}
+
+/** The content-type of a URL (lowercased, no parameters), via HEAD. Null on any failure.
+ * For this one HEAD of an image a shop embeds in its own page, a 4xx robots.txt (an image bucket
+ * like static.ananas.rs answers 403) counts as no robots.txt, as RFC 9309 says. Page fetches stay stricter. */
+export async function politeContentType(url: string): Promise<string | null> {
+	try {
+		const target = new URL(url)
+		const robots = await getRobots(target.origin).catch(err => {
+			if (err instanceof HttpError && err.status >= 400 && err.status < 500 && err.status !== 429) return ""
+			throw err
+		})
+		if (!isAllowedByRobots(robots, target.pathname + target.search)) return null
+		return await enqueue(target.host, DEFAULT_INTERVAL_MS, () => headContentType(url))
+	} catch {
+		return null
+	}
+}
+
+async function headContentType(url: string): Promise<string | null> {
+	const headers = { "user-agent": USER_AGENT }
+	let res = await fetch(url, { method: "HEAD", headers, signal: AbortSignal.timeout(TIMEOUT_MS) })
+	if (res.status === 405) {
+		// Some servers refuse HEAD. Read the headers of a GET and drop the body unread.
+		res = await fetch(url, { headers: { ...headers, accept: "*/*" }, signal: AbortSignal.timeout(TIMEOUT_MS) })
+		await res.body?.cancel().catch(() => undefined)
+	}
+	if (!res.ok) return null
+	return res.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() || null
 }
 
 function parseRobots(txt: string): Group[] {

@@ -29,8 +29,8 @@ export const toGoal = (d: Draft): Goal => ({
 	assets: d.assets.map(a => ({ ...a, expectedPrice: opt(a.expectedPrice), fee: num(a.fee || "0"), delivery: num(a.delivery || "0"), days: num(a.days) })),
 })
 
-/** "your price" for prices the user wrote or edited; "typical price (estimate)" for catalogue msrp. */
-export const priceLabel = (source?: PriceSource) => source === "catalogue" ? "typical price (estimate)" : "your price"
+/** "your price" for prices the user wrote or edited; "typical price (estimate)" for catalogue msrp; "shop price" for a listing the scouts read. */
+export const priceLabel = (source?: PriceSource) => source === "catalogue" ? "typical price (estimate)" : source === "listing" ? "shop price" : "your price"
 
 export function planIdFromUrl() { return new URLSearchParams(location.search).get("plan") }
 export function setPlanInUrl(id: string | null) {

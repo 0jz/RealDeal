@@ -4,11 +4,23 @@ import { mkdtempSync, readdirSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
-import { commandGoal, createGoal, createGoalFromPrompt, EXAMPLE_GOAL, getGoal, PromptError, subscribeGoal } from "./engine"
+import { commandGoal, createGoal, createGoalFromPrompt, EXAMPLE_GOAL, getGoal, PromptError, setScoutShops, subscribeGoal } from "./engine"
+import { stubShops } from "../scout/stub"
 import type { Command, FinanceView } from "./types"
 
 process.env.REALDEAL_LLM = "0"
 process.env.REALDEAL_SESSIONS = mkdtempSync(join(tmpdir(), "realdeal-sessions-"))
+setScoutShops(stubShops(84_999))
+
+/** Settled and every scouting run finished. */
+export function scouted(id: string): Promise<FinanceView> {
+	return new Promise((resolve, reject) => {
+		let off = () => {}
+		const timer = setTimeout(() => { off(); reject(new Error(`Goal ${id} did not finish scouting`)) }, 5000)
+		const done = (v: FinanceView) => !v.pending && Object.keys(v.scoutWants ?? {}).every(w => (v.scouts?.[w]?.finishedAt ?? "") !== "")
+		off = subscribeGoal(id, v => { if (done(v)) { queueMicrotask(off); clearTimeout(timer); resolve(v) } })
+	})
+}
 
 export function settled(id: string): Promise<FinanceView> {
 	return new Promise((resolve, reject) => {
@@ -72,11 +84,18 @@ test("plans are saved to disk and bad IDs are rejected", async () => {
 })
 test("a prompt becomes a stored plan with its intent, and update-goal keeps the intent", async () => {
 	const created = await createGoalFromPrompt({ prompt: "Hoću iPhone 15 za 85k, prodajem stari ajfon 13", budget: 100000 })
-	const v = await settled(created.id)
-	assert.match(v.goal.wishes[0].name, /iPhone 15/)
-	assert.equal(v.goal.wishes[0].price, 85000)
+	// Before the scouts report, the wish has no price and stays out of the budget.
+	assert.equal(created.goal.wishes[0].priceSource, "listing")
+	assert.equal(created.plan.expectedCosts, 0)
+	const v = await scouted(created.id)
+	const wish = v.goal.wishes[0]
+	assert.match(wish.name, /iPhone 15/i)
+	assert.equal(wish.price, 84999)
+	assert.equal(wish.priceSource, "listing")
+	assert.equal(wish.link, v.scouts?.[wish.id]?.best?.url)
+	assert.equal(v.scouts?.[wish.id]?.best?.verified, true)
+	assert.ok(v.runs.some(r => r.agent === "AnanasScout" && r.status === "accepted"))
 	assert.ok(v.intent)
-	assert.ok(v.alternatives)
 	assert.ok(JSON.parse(readFileSync(join(process.env.REALDEAL_SESSIONS!, `${v.id}.json`), "utf8")).intent)
 	const updated = await settled(act(v, { type: "update-goal", goal: { ...v.goal, cash: 110000 } }).id)
 	assert.deepEqual(updated.intent, v.intent)
