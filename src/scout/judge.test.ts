@@ -197,3 +197,15 @@ test("a device leaf does not suppress explicit accessories or a wrong product ca
 	]) assert.ok(judgeOffline(want({ query: "laptop" }), listing).drop, listing.title)
 	assert.equal(judgeOffline(want({ query: "baterija za laptop" }), cand("Baterija za laptop HP 250")).drop, undefined)
 })
+
+test("a brand query keeps only that brand's devices", () => {
+	assert.equal(judgeOffline(want({ query: "iphone" }), cand("Apple iPhone 15 128GB Black")).drop, undefined)
+	assert.ok(judgeOffline(want({ query: "iphone" }), cand("Samsung Galaxy S24 128GB")).score < 0.6) // under MIN_SCORE: the ranker drops it
+})
+
+test("the category word \"phone\" matches any phone, not just iPhones", () => {
+	assert.equal(judgeOffline(want({ query: "phone" }), cand("Samsung Galaxy S24 128GB")).drop, undefined)
+	assert.equal(judgeOffline(want({ query: "phone" }), cand("Google Pixel 9 128GB")).drop, undefined)
+	assert.equal(judgeOffline(want({ query: "New phone" }), cand("Samsung Galaxy S24 128GB")).drop, undefined)
+	assert.equal(judgeOffline(want({ query: "phone" }), cand("MacBook Air M3 512GB")).drop, "mismatch")
+})

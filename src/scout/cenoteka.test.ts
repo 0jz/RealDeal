@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { test } from "node:test"
+import { noteBlocked } from "../sources/customer"
+import { ScoutBlocked } from "./types"
 import { createCenotekaScout, parseCenotekaProduct } from "./cenoteka"
 
 const saved = (name: string): string => readFileSync(new URL(`../../data/pages/cenoteka/${name}`, import.meta.url), "utf8")
@@ -82,4 +84,17 @@ test("read uses the injected fetcher for the product page", async () => {
 test("a tiny price limit does not open expensive product pages", async () => {
 	const scout = createCenotekaScout(async () => categoryHtml)
 	assert.deepEqual(await scout.search("telefon", { maxPrice: 1 }), [])
+})
+
+test("an empty page without a challenge is not a block", async () => {
+	const scout = createCenotekaScout(async () => null)
+	assert.deepEqual(await scout.search("laptop", {}), [])
+})
+
+// Last in the file: noteBlocked puts the host in a 10-minute cool-down for this process.
+test("a challenged host makes the scout report blocked, not an empty ok", async () => {
+	noteBlocked("https://cenoteka.rs/laptopovi-cene/")
+	const scout = createCenotekaScout(async () => null)
+	await assert.rejects(scout.search("laptop", {}), ScoutBlocked)
+	await assert.rejects(scout.read(productUrl), ScoutBlocked)
 })
