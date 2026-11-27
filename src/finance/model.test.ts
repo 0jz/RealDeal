@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { EXAMPLE_GOAL } from "./engine"
-import { assessOffers, cashBalance, emptyLedger, estimateResale, matchProduct, optimize, reserved, transact, validateGoal } from "./model"
+import { assessOffers, cashBalance, eligible, emptyLedger, estimateResale, matchProduct, optimize, reserved, transact, validateGoal } from "./model"
 import type { Goal } from "./types"
 
 const G = EXAMPLE_GOAL
@@ -147,4 +147,12 @@ test("budget sweep: every plan conserves money and keeps the reserve", () => {
 			assert.ok(p.availableCash >= 0)
 		}
 	}
+})
+
+test("a scouted listing without delivery on the page is a warning, not a block", () => {
+	const g = validateGoal({ ...EXAMPLE_GOAL, wishes: [{ id: "w1", name: "Jakna", priority: 1, price: 2599, delivery: null, shop: "Ananas", link: "https://ananas.rs/proizvod/x/1", warrantyMonths: 24, condition: "new", priceSource: "listing" }] })
+	const [o] = assessOffers(g)
+	assert.equal(o.blocked, false)
+	assert.ok(o.risks.includes("The shop's page doesn't list delivery: check it at checkout"))
+	assert.ok(eligible(g, o))
 })

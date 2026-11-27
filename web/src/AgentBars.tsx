@@ -7,6 +7,13 @@ const LANES = [
 	{ agent: "ResaleAgent", color: "var(--log-resale)" },
 	{ agent: "ShopTrustAgent", color: "var(--log-trust)" },
 	{ agent: "StrategyAgent", color: "var(--log-strategy)" },
+	{ agent: "QueryAgent", color: "var(--log-query)" },
+	{ agent: "TehnomediaScout", color: "var(--log-scout)" },
+	{ agent: "AnanasScout", color: "var(--log-scout)" },
+	{ agent: "OfficeShoesScout", color: "var(--log-scout)" },
+	{ agent: "GigatronScout", color: "var(--log-scout)" },
+	{ agent: "JudgeAgent", color: "var(--log-judge)" },
+	{ agent: "VerifyAgent", color: "var(--log-verify)" },
 ] as const
 
 const queuedAt = (r: AgentRun) => (r as AgentRun & { queuedMs?: number }).queuedMs ?? r.startMs

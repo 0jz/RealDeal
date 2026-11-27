@@ -90,6 +90,47 @@ test("provider failure falls back to the parser", async () => {
 	} finally { globalThis.fetch = original; restoreEnv(env) }
 })
 
+test("any product type is kept with its query and attributes", async () => {
+	const env = saveEnv(); process.env.REALDEAL_LLM = "1"; process.env.OPENAI_API_KEY = "test"
+	const restore = answer({ wants: [{ text: "crna zimska jakna size M", query: "crna zimska jakna", attributes: ["size M", "crna"], priority: 1 }], sells: [] })
+	try {
+		const r = await interpret("crna zimska jakna size M")
+		assert.equal(r.mode, "LLM")
+		assert.equal(r.intent.wants.length, 1)
+		assert.equal(r.intent.wants[0]?.query, "crna zimska jakna")
+		assert.deepEqual(r.intent.wants[0]?.attributes, ["size M", "crna"])
+		assert.equal(r.intent.wants[0]?.productId, undefined)
+	} finally { restore(); restoreEnv(env) }
+})
+
+test("a model range the text does not state is ignored, the rules' range is used", async () => {
+	const env = saveEnv(); process.env.REALDEAL_LLM = "1"; process.env.OPENAI_API_KEY = "test"
+	const restore = answer({ wants: [{ text: "telefon", category: "phone", query: "telefon", maxPrice: 5000, minPrice: 1000, priority: 1 }], sells: [] })
+	const text = "telefon do 60000"
+	try {
+		const r = await interpret(text)
+		assert.equal(r.intent.wants[0]?.maxPrice, parsePrompt(text).intent.wants[0]?.maxPrice)
+		assert.equal(r.intent.wants[0]?.maxPrice, 60000)
+		assert.equal(r.intent.wants[0]?.minPrice, undefined)
+	} finally { restore(); restoreEnv(env) }
+})
+
+test("a model want with empty text or query is dropped", async () => {
+	const env = saveEnv(); process.env.REALDEAL_LLM = "1"; process.env.OPENAI_API_KEY = "test"
+	const restore = answer({ wants: [
+		{ text: "", query: "", productId: "iphone-15" },
+		{ text: "   ", query: "patike" },
+		{ text: "patike Nike", query: "patike Nike", attributes: ["", 7, "broj 43"], priority: 1 },
+	], sells: [] })
+	try {
+		const r = await interpret("patike Nike broj 43")
+		assert.equal(r.mode, "LLM")
+		assert.equal(r.intent.wants.length, 1)
+		assert.equal(r.intent.wants[0]?.text, "patike Nike")
+		assert.deepEqual(r.intent.wants[0]?.attributes, ["broj 43"])
+	} finally { restore(); restoreEnv(env) }
+})
+
 test("instructions in the prompt cannot set a price", async () => {
 	const env = saveEnv(); process.env.REALDEAL_LLM = "1"; process.env.OPENAI_API_KEY = "test"
 	const restore = answer({ wants: [{ text: "phone", productId: "iphone-15", category: "phone", priority: 1, price: 1, maxPrice: 1 }], sells: [] })

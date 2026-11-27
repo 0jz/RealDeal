@@ -110,6 +110,11 @@ async function loadIndex(): Promise<Entry[]> {
 	return urls.map((url) => ({ url, tokens: slugTokens(url) }))
 }
 
+/** Product page URLs matching a term, from the sitemap index (never from Gigatron's disallowed search). */
+export async function findGigatronProductUrls(term: string): Promise<string[]> {
+	return (await loadIndex()).filter((e) => slugMatches(e.tokens, term)).map((e) => e.url)
+}
+
 export function createGigatronAdapter(): SourceAdapter {
 	let index: Promise<Entry[]> | null = null
 	const getIndex = () => {

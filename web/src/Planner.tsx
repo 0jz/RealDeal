@@ -4,7 +4,7 @@ import { motion, useReducedMotion } from "motion/react"
 import { toast } from "sonner"
 import { LiveLog, PlanDetails, settled } from "./LiveLog"
 import { BestPick } from "./BestPick"
-import { useListings } from "./useListings"
+import { isRefurbished } from "../../src/scout/judge"
 import { Toaster } from "./components/ui/sonner"
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "./components/ui/dialog"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./components/ui/collapsible"
@@ -136,8 +136,7 @@ export function Planner() {
 		setView(null); setKept(null); setPhase("idle"); setDraft(blankDraft()); setEditing(false); setText(""); setError(""); setMiss(null); setSaleAmounts({}); setBusy(false); setPlanInUrl(null)
 	}
 
-	const picks = view ? picksOf(view, catalogue, kept) : []
-	const listings = useListings(picks.flatMap(p => [p.product, ...p.alternatives]).filter((p): p is Product => !!p))
+	const picks = view ? picksOf(view) : []
 
 	const onPromptKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
 		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void plan() }
@@ -216,23 +215,19 @@ export function Planner() {
 
 		<section aria-labelledby="plan-headline">
 			<h1 id="plan-headline" className="scroll-mt-32">Buy what fits now.</h1>
-			{picks.map(({ wish, product, alternatives }) => <BestPick key={wish.id} wish={wish} product={product} alternatives={alternatives} listings={listings} busy={busy} sellFirst={sellFirst}
-				onSwap={p => applyGoal({ ...view.goal, wishes: view.goal.wishes.map(w => w.id === wish.id ? { ...wish, name: p.name, price: p.typicalPrice, priceSource: "catalogue", delivery: null } : w) })} />)}
+			{picks.map(({ wish }) => <BestPick key={wish.id} wish={wish} scout={view.scouts?.[wish.id]} scouting={!!view.scoutWants?.[wish.id] && (view.scouts?.[wish.id]?.finishedAt ?? "") === ""} busy={busy} sellFirst={sellFirst}
+				onUse={l => applyGoal({ ...view.goal, wishes: view.goal.wishes.map(w => w.id === wish.id ? { ...w, name: l.title.slice(0, 100), condition: isRefurbished(l.title) ? "used" : "new", price: l.price, priceSource: "listing", delivery: l.delivery, shop: l.shop.slice(0, 100), link: l.url.length <= 500 ? l.url : "" } : w) })} />)}
+			{view.scoutWants && <button type="button" className="ghost mt-6" disabled={busy || picks.some(({ wish }) => (view.scouts?.[wish.id]?.finishedAt ?? "") === "")} onClick={() => void send({ type: "refresh" })}>Check prices again</button>}
 		</section>
-		<footer className="foot">RealDeal doesn't buy, sell or hold money. Prices are the ones you entered or found in shops; typical prices are rough figures and can be out of date.</footer>
+		<footer className="foot">RealDeal doesn't buy, sell or hold money. Prices are the ones you entered or read from the shop's own page at the time shown; they can change.</footer>
 	</motion.div></>
 }
 
 /** One card per thing to buy now; with nothing affordable yet, one per wish. */
-function picksOf(view: FinanceView, catalogue: Product[], kept: Kept | null) {
+function picksOf(view: FinanceView) {
 	const buying = new Set(view.plan.actions.filter(a => a.kind === "buy").map(a => view.offers.find(o => o.id === a.id)?.wishId))
 	const wishes = buying.size ? view.goal.wishes.filter(w => buying.has(w.id)) : view.goal.wishes
-	return wishes.map(wish => {
-		const offer = view.offers.find(o => o.wishId === wish.id && o.productId)
-		const product = catalogue.find(p => p.name === wish.name || `${p.brand} ${p.name}` === wish.name) ?? catalogue.find(p => p.id === offer?.productId)
-		const alternatives = (kept?.alternatives[wish.id] ?? []).map(id => catalogue.find(p => p.id === id)).filter((p): p is Product => !!p && p.id !== product?.id && p.name !== wish.name).slice(0, 4)
-		return { wish, product, alternatives }
-	})
+	return wishes.map(wish => ({ wish }))
 }
 
 /** A chip that opens a small popover. Closes on Escape or a click outside. */

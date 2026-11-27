@@ -1,6 +1,6 @@
 import { PRODUCTS } from "../search/catalogue"
 import { resolveQuery } from "../search/matcher"
-import type { Command, Goal, Ledger, Offer, Plan, Resale } from "./types"
+import type { Command, Goal, Ledger, Offer, Plan, Resale, Wish } from "./types"
 
 export const money = (n: unknown): n is number => typeof n === "number" && Number.isSafeInteger(n) && n >= 0 && n <= 10_000_000
 const requireMoney = (n: unknown, what = "Amount") => { if (!money(n)) throw new Error(`${what} must be a whole number of RSD between 0 and 10,000,000`) }
@@ -31,9 +31,9 @@ export function validateGoal(input: unknown): Goal {
 	for (const w of g.wishes) {
 		if (!int(w.priority, 1, 10)) throw new Error("Priority must be 1–10 (1 first)")
 		requireMoney(w.price, `Price of ${w.name}`)
-		if (w.price === 0) throw new Error(`Enter the price of ${w.name}`)
+		if (w.price === 0 && !noListing(w)) throw new Error(`Enter the price of ${w.name}`)
 		if (w.delivery !== null) requireMoney(w.delivery, `Delivery for ${w.name}`)
-		if (w.priceSource !== undefined && !["you", "catalogue"].includes(w.priceSource)) throw new Error("Price source must be you or catalogue")
+		if (w.priceSource !== undefined && !["you", "catalogue", "listing"].includes(w.priceSource)) throw new Error("Price source must be you, catalogue or listing")
 		if (!text(w.shop, 100)) throw new Error("Shop name is too long")
 		if (!text(w.link, 500) || (w.link && !/^https?:\/\/\S+$/i.test(w.link))) throw new Error(`Link for ${w.name} must start with http:// or https://`)
 		if (!int(w.warrantyMonths, 0, 60)) throw new Error("Warranty must be 0–60 months")
@@ -57,10 +57,13 @@ export function matchProduct(name: string): string | null {
 export const typicalPrice = (productId: string | null) => (productId && PRODUCTS.get(productId)?.msrp) || null
 
 /** The user's entered offers, matched to the catalogue. Not checked yet: blocked until risk-checked. */
+/** A wish the scouts have no listing for (yet). It has no price, so it stays out of the budget. */
+export const noListing = (w: Wish) => w.priceSource === "listing" && w.price === 0
+
 export function buildOffers(g: Goal): Offer[] {
-	return g.wishes.map(w => {
+	return g.wishes.filter(w => !noListing(w)).map(w => {
 		const productId = matchProduct(w.name)
-		return { id: w.id, wishId: w.id, productId, name: w.name, price: w.price, delivery: w.delivery, shop: w.shop, link: w.link, warrantyMonths: w.warrantyMonths, condition: w.condition, typicalPrice: typicalPrice(productId), priceSource: w.priceSource ?? "you", risks: ["Not checked yet"], blocked: true }
+		return { id: w.id, wishId: w.id, productId, name: w.name, price: w.price, delivery: w.delivery, shop: w.shop, link: w.link, warrantyMonths: w.warrantyMonths, condition: w.condition, typicalPrice: w.priceSource === "listing" ? null : typicalPrice(productId), priceSource: w.priceSource ?? "you", risks: ["Not checked yet"], blocked: true }
 	})
 }
 
@@ -72,7 +75,8 @@ export function checkRisks(g: Goal, offers: Offer[]): RiskCheck {
 		let blocked = false
 		const estimate = o.priceSource === "catalogue"
 		if (o.delivery === null) {
-			if (deliveryPending(o)) risks.push("Delivery not known yet; add it when you pick a shop")
+			if (o.priceSource === "listing") risks.push("The shop's page doesn't list delivery: check it at checkout")
+			else if (deliveryPending(o)) risks.push("Delivery not known yet; add it when you pick a shop")
 			else { risks.push("Delivery cost unknown: ask the shop before paying"); blocked = true }
 		}
 		if (o.warrantyMonths < g.minWarrantyMonths) { risks.push(`Warranty ${o.warrantyMonths} months is below your minimum of ${g.minWarrantyMonths}`); blocked = true }
@@ -103,8 +107,8 @@ export const emptyLedger = (): Ledger => ({ confirmedResale: 0, spent: 0, verifi
 export const total = (o: Offer) => o.price + (o.delivery ?? 0)
 export const cashBalance = (g: Goal, l: Ledger) => g.cash + l.confirmedResale - l.spent
 export const reserved = (l: Ledger) => Object.values(l.reservations).reduce((a, b) => a + b, 0)
-/** No shop picked yet (an estimate, or a price from the prompt): unknown delivery is expected, not a red flag. */
-const deliveryPending = (o: Offer) => o.delivery === null && (o.priceSource === "catalogue" || !o.shop)
+/** No shop picked yet (an estimate, or a price from the prompt), or a shop page that doesn't list delivery: expected, not a red flag. */
+const deliveryPending = (o: Offer) => o.delivery === null && (o.priceSource === "catalogue" || o.priceSource === "listing" || !o.shop)
 export const eligible = (g: Goal, o: Offer) => money(o.price) && o.price > 0 && money(deliveryPending(o) ? 0 : o.delivery) && !o.blocked && o.warrantyMonths >= g.minWarrantyMonths
 const ESTIMATE = "Enter what you actually paid: this price is only an estimate"
 /** What the user actually paid: the entered amount, else the estimate for user-priced offers. */
@@ -119,7 +123,8 @@ const paidAmount = (o: Offer, paid: number | undefined) => {
  * Estimated proceeds fund a conditional plan, NEVER the cash guard. */
 export function optimize(g: Goal, l: Ledger, offers: Offer[], resale: Resale[]): Plan {
 	const cash = cashBalance(g, l)
-	const wishes = g.wishes.filter(w => !l.purchased.includes(w.id)).sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id))
+	const unlisted = g.wishes.filter(w => !l.purchased.includes(w.id) && noListing(w))
+	const wishes = g.wishes.filter(w => !l.purchased.includes(w.id) && !noListing(w)).sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id))
 	const options = wishes.map(w => offers.filter(o => o.wishId === w.id && eligible(g, o)).sort((a, b) => total(a) - total(b) || a.id.localeCompare(b.id))[0])
 	const assets = resale.filter(r => !l.sold.includes(r.assetId) && g.assets.some(a => a.id === r.assetId) && r.days <= g.deadlineDays && r.net > 0)
 	let best = { score: -1, cost: 0, proceeds: 0, buys: [] as Offer[], sells: [] as Resale[] }
@@ -150,6 +155,7 @@ export function optimize(g: Goal, l: Ledger, offers: Offer[], resale: Resale[]):
 		const why = o && !eligible(g, o) ? `Blocked: ${o.risks.filter(Boolean).join("; ") || "offer incomplete"}.` : "Not enough money for this one yet without breaking your reserve."
 		actions.push({ kind: "wait", id: w.id, name: w.name, amount: 0, when: "Wait for a cheaper offer or more cash", why })
 	}
+	for (const w of unlisted) actions.push({ kind: "wait", id: w.id, name: w.name, amount: 0, when: "No listing found yet", why: "The scouts have no listing with a real price for this, so it isn't counted in the budget." })
 	return {
 		actions, selectedOffers: best.buys.map(o => o.id), selectedAssets: best.sells.map(r => r.assetId),
 		availableCash: cash - g.reserve - reserved(l), reservedCash: reserved(l) + g.reserve,
@@ -157,7 +163,7 @@ export function optimize(g: Goal, l: Ledger, offers: Offer[], resale: Resale[]):
 		projectedRemaining: cash + best.proceeds - best.cost, netAcquisitionCost: best.cost - best.proceeds,
 		verifiedSavings: l.verifiedSavings,
 		forecastSavings: best.buys.reduce((n, o) => n + saving(o), 0),
-		conditional, complete: best.buys.length === wishes.length,
+		conditional, complete: best.buys.length === wishes.length && !unlisted.length,
 	}
 }
 

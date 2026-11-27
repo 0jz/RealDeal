@@ -1,6 +1,7 @@
 import { CATALOGUE, PRODUCTS, productName } from "../search/catalogue"
 import type { Category, Product } from "../search/types"
 import { assessOffers, emptyLedger, estimateResale, optimize, validateGoal } from "./model"
+import type { ScoutWant } from "../scout/types"
 import type { Asset, Goal, Intent, IntentWant, Plan, Wish } from "./types"
 
 type Options = { reserve?: number; deadlineDays?: number }
@@ -123,4 +124,31 @@ export function choose(intent: Intent, budget: number, options: Options = {}): C
 	})
 
 	return { goal, alternatives, uncovered }
+}
+
+/** The listing path: one wish per want, each waiting for the scouts (price 0, source "listing", out of the budget until found).
+ * No catalogue product or typical price is used; the catalogue path above stays for older plans. */
+export function wishesFromWants(intent: Intent, budget: number, options: Options = {}): { goal: Goal; wants: Record<string, ScoutWant> } {
+	const wants = intent.wants
+		.map((want, i) => ({ want, i }))
+		.filter(x => (x.want.query ?? x.want.text).trim())
+		.sort((a, b) => a.want.priority - b.want.priority || a.i - b.i)
+		.slice(0, MAX)
+		.map(x => x.want)
+	if (!wants.length) throw new Error("Nothing to buy found in the prompt")
+	const assets: Asset[] = intent.sells.slice(0, MAX).map((sell, i) => {
+		const name = (sell.productId ? productName(sell.productId) : sell.text.trim()).slice(0, 100)
+		return { id: `s${i + 1}`, name: name || `Item ${i + 1}`, condition: sell.condition, expectedPrice: sell.expectedPrice ?? null, fee: 0, delivery: 0, days: 7 }
+	})
+	const scoutWants: Record<string, ScoutWant> = {}
+	const wishes: Wish[] = wants.map((want, i) => {
+		const id = `w${i + 1}`
+		const query = (want.query ?? want.text).trim().slice(0, 100)
+		scoutWants[id] = { wantText: want.text.trim().slice(0, 200), query, attributes: want.attributes ?? [], minPrice: want.minPrice, maxPrice: want.maxPrice ?? want.price }
+		return { id, name: query.slice(0, 100), priority: Math.min(10, Math.max(1, want.priority)), price: 0, delivery: null, shop: "", link: "", warrantyMonths: 24, condition: "new", priceSource: "listing" }
+	})
+	const title = [...wishes.map(w => w.name), ...assets.map(a => `sell ${a.name}`)].join(", ").slice(0, 300)
+	const reserve = Math.min(options.reserve ?? intent.reserve ?? 0, budget)
+	const goal = validateGoal({ title, cash: budget, reserve, deadlineDays: options.deadlineDays ?? intent.deadlineDays ?? 14, minWarrantyMonths: 0, wishes, assets })
+	return { goal, wants: scoutWants }
 }

@@ -4,7 +4,11 @@ import { join } from "node:path"
 import { randomUUID } from "node:crypto"
 import { EventTypeIs } from "../agents/kit"
 import { applyRisks, buildOffers, matchProduct, cashBalance, checkRisks, eligible, emptyLedger, estimateResale, money, optimize, reserved, total, transact, validateGoal, type RiskCheck } from "./model"
-import { choose } from "./choose"
+import { wishesFromWants } from "./choose"
+import { isRefurbished } from "../scout/judge"
+import { clearScoutCache, runScouts, type RunEvent } from "../scout/run"
+import { shopDeps } from "../scout/shops"
+import { SCOUT_SITES, type ScoutListing, type ScoutResult, type ScoutWant } from "../scout/types"
 import { interpret } from "./interpret"
 import { MAX_PROMPT } from "./prompt"
 import type { AgentRun, CommandRequest, FinanceView, Goal, Offer, Resale } from "./types"
@@ -23,6 +27,8 @@ type Role = typeof ROLES[number]
 type Session = {
 	view: FinanceView; epoch: number; cycle: number; rawOffers: Offer[]; risk: RiskCheck
 	strategyRunning: boolean; strategyQueued: boolean
+	/** Bumped to cancel the scouting runs in flight (a re-check or a newer run replaces them). */
+	scoutGen: number
 	listeners: Set<(v: FinanceView) => void>; touchedAt: number
 }
 type Job = { id: number; session: Session; role: Role; epoch: number; revision: number; snapshot: FinanceView; run: AgentRun; result?: Offer[] | Resale[] | RiskCheck; error?: string }
@@ -57,13 +63,15 @@ function load(id: string): Session | undefined {
 	start()
 	view.pending = 0
 	for (const r of view.runs) if (r.status === "running") { r.status = "stale"; r.detail = "Interrupted by a server restart" }
-	const s: Session = { view, epoch: 0, cycle: 0, rawOffers: [], risk: {}, strategyRunning: false, strategyQueued: false, listeners: new Set(), touchedAt: Date.now() }
+	const s: Session = { view, epoch: 0, cycle: 0, rawOffers: [], risk: {}, strategyRunning: false, strategyQueued: false, scoutGen: 0, listeners: new Set(), touchedAt: Date.now() }
 	evict()
 	state.sessions.set(id, s)
 	// Re-check the stored plan with the current rules.
 	s.epoch++
 	recalculate(s, "Plan reopened; checking it again")
 	for (const role of ROLES) launch(s, role)
+	// Scouting that a restart cut short starts again; finished results are kept as they are.
+	if (Object.keys(s.view.scoutWants ?? {}).some(id => (s.view.scouts?.[id]?.finishedAt ?? "") === "")) scout(s, false)
 	return s
 }
 const session = (id: string) => state.sessions.get(id) ?? load(id)
@@ -216,7 +224,7 @@ export function createGoal(input: unknown): FinanceView {
 	evict()
 	const ledger = emptyLedger()
 	const view: FinanceView = { id: randomUUID(), revision: 0, sequence: 0, goal, ledger, offers: [], resale: [], plan: optimize(goal, ledger, [], []), reason: "Checking your offers, sale prices and risks", history: [], runs: [], notes: {}, pending: 0, updatedAt: new Date().toISOString() }
-	const s: Session = { view, epoch: 0, cycle: 0, rawOffers: [], risk: {}, strategyRunning: false, strategyQueued: false, listeners: new Set(), touchedAt: Date.now() }
+	const s: Session = { view, epoch: 0, cycle: 0, rawOffers: [], risk: {}, strategyRunning: false, strategyQueued: false, scoutGen: 0, listeners: new Set(), touchedAt: Date.now() }
 	state.sessions.set(view.id, s)
 	for (const role of ROLES) launch(s, role)
 	return snapshot(s)
@@ -241,14 +249,14 @@ export async function createGoalFromPrompt(input: unknown): Promise<FinanceView>
 	if (!parsed.wants.length) throw new PromptError("I couldn't find anything to buy in that.", unknown.length ? unknown : [prompt])
 	budget ??= parsed.budget
 	if (budget === undefined) throw new PromptError('How much can you spend? Add an amount, like "for 80000 RSD".', [])
-	let chosen: ReturnType<typeof choose>
-	try { chosen = choose(parsed, budget) } catch { throw new PromptError("I couldn't find anything to buy in that.", unknown.length ? unknown : [prompt]) }
-	// The chosen goal goes through createGoal; the intent and swap options are then stored on the same view.
+	let chosen: ReturnType<typeof wishesFromWants>
+	try { chosen = wishesFromWants(parsed, budget) } catch { throw new PromptError("I couldn't find anything to buy in that.", unknown.length ? unknown : [prompt]) }
+	// Every wish waits for the scouts: no price until a real listing is found. The plan is returned right away and fills in live.
 	const created = createGoal(chosen.goal)
 	const s = state.sessions.get(created.id)!
 	s.view.intent = { ...parsed, budget }
-	// Keep the chosen product in its own list so the user can swap back to it later.
-	s.view.alternatives = Object.fromEntries(chosen.goal.wishes.map(w => { const own = matchProduct(w.name); const alts = chosen.alternatives[w.id] ?? []; return [w.id, own && !alts.includes(own) ? [own, ...alts] : alts] }))
+	s.view.scoutWants = chosen.wants
+	scout(s, false)
 	save(s)
 	return snapshot(s)
 }
@@ -277,6 +285,7 @@ export function commandGoal(id: string, input: CommandRequest): FinanceView {
 		const l = s.view.ledger
 		if (goal.cash + l.confirmedResale - l.spent - reserved(l) < goal.reserve) throw new Error("Cash can't be lower than what you've already spent and set aside")
 		s.view.goal = goal
+		promoteChosen(s)
 		// Old offers and sale estimates must not be acted on until the new ones are checked.
 		s.rawOffers = buildOffers(goal); s.risk = {}; s.view.resale = []
 		reason = "Goal updated; checking again"
@@ -289,7 +298,104 @@ export function commandGoal(id: string, input: CommandRequest): FinanceView {
 	recalculate(s, reason)
 	if (reanalyze) for (const role of ROLES.slice(0, 3)) launch(s, role)
 	launch(s, "StrategyAgent")
+	if (c.type === "refresh") scout(s, true)
 	if (cashBalance(s.view.goal, s.view.ledger) - reserved(s.view.ledger) < s.view.goal.reserve) throw new Error("Internal cash invariant violated")
 	notify(s)
 	return snapshot(s)
+}
+
+// ---- Scouting: real listings per wish (src/scout). Runs in the background and streams into the view. ----
+
+let scoutShops = shopDeps
+/** Tests and the offline check swap in stub shops (src/scout/stub.ts) so they never touch the network. */
+export function setScoutShops(deps: typeof shopDeps) { scoutShops = deps }
+
+const SCOUT_AGENT: Record<RunEvent["site"], string> = { query: "QueryAgent", tehnomedia: "TehnomediaScout", ananas: "AnanasScout", officeshoes: "OfficeShoesScout", gigatron: "GigatronScout", judge: "JudgeAgent", verify: "VerifyAgent" }
+
+/** Starts one scouting run per wish that came from a prompt. `fresh` drops cached results ("Check prices again"). */
+function scout(s: Session, fresh: boolean) {
+	const wants = s.view.scoutWants
+	if (!wants) return
+	const gen = ++s.scoutGen
+	if (fresh) clearScoutCache()
+	for (const [wishId, want] of Object.entries(wants)) {
+		if (!s.view.goal.wishes.some(w => w.id === wishId) || s.view.ledger.purchased.includes(wishId)) continue
+		const old = s.view.scouts?.[wishId]
+		if (old) s.view.scouts = { ...s.view.scouts, [wishId]: { ...old, finishedAt: "" } }
+		void scoutWish(s, gen, wishId, want)
+	}
+	notify(s)
+}
+
+async function scoutWish(s: Session, gen: number, wishId: string, want: ScoutWant) {
+	const cancelled = () => gen !== s.scoutGen || !state.sessions.has(s.view.id)
+	const open = new Map<string, AgentRun>()
+	const runFor = (agent: string): AgentRun => {
+		let run = open.get(agent)
+		if (run) return run
+		const now = performance.now()
+		run = { id: ++nextRun, agent, revision: s.view.revision, cycle: s.cycle, startedAt: new Date().toISOString(), queuedMs: now, startMs: now, status: "running", mode: "offline analysis" }
+		open.set(agent, run)
+		s.view.runs.push(run)
+		return run
+	}
+	const end = (run: AgentRun, status: AgentRun["status"], detail?: string) => {
+		run.status = status; run.endMs = performance.now(); run.finishedAt = new Date().toISOString()
+		if (detail) run.detail = detail
+		open.delete(run.agent)
+	}
+	const onEvent = (e: RunEvent) => {
+		if (cancelled()) return
+		const run = runFor(SCOUT_AGENT[e.site])
+		if (e.kind === "done") end(run, "accepted", e.detail)
+		else if (e.kind === "error") end(run, "error", e.detail)
+		else run.detail = e.detail
+		notify(s)
+	}
+	let result: ScoutResult
+	try {
+		result = await runScouts(want, { ...scoutShops(), onEvent, isCancelled: cancelled, onPartial: r => { if (!cancelled()) { s.view.scouts = { ...s.view.scouts, [wishId]: r }; notify(s) } } })
+	} catch (error) {
+		console.error("[scout] run failed", s.view.id, wishId, error)
+		const site = { status: "error" as const, pages: 0, found: 0, note: "the scouting run failed" }
+		result = { wantText: want.wantText, query: want.query, minPrice: want.minPrice, maxPrice: want.maxPrice, best: null, next: [], mentions: [], sites: Object.fromEntries(SCOUT_SITES.map(x => [x, site])) as ScoutResult["sites"], trace: [], finishedAt: new Date().toISOString() }
+	}
+	for (const run of [...open.values()]) end(run, cancelled() ? "stale" : "accepted")
+	if (cancelled()) { notify(s); return }
+	s.view.scouts = { ...s.view.scouts, [wishId]: result }
+	useListing(s, wishId, result.best)
+}
+
+/** The best pick's exact price becomes the wish's price; no listing means no price and no place in the budget. */
+function useListing(s: Session, wishId: string, best: ScoutListing | null) {
+	const wish = s.view.goal.wishes.find(w => w.id === wishId)
+	// A price the user typed wins over the scouts; a bought wish is settled.
+	if (!wish || wish.priceSource !== "listing" || s.view.ledger.purchased.includes(wishId)) { notify(s); return }
+	const next = best
+		? { ...wish, name: best.title.slice(0, 100) || wish.name, condition: isRefurbished(best.title) ? "used" as const : "new" as const, price: best.price, delivery: best.delivery, shop: best.shop.slice(0, 100), link: best.url.length <= 500 ? best.url : "" }
+		: { ...wish, price: 0, delivery: null, shop: "", link: "" }
+	const goal = validateGoal({ ...s.view.goal, wishes: s.view.goal.wishes.map(w => w.id === wishId ? next : w) })
+	s.view.goal = goal
+	s.rawOffers = buildOffers(goal); s.risk = {}; s.view.resale = []
+	s.epoch++; s.cycle++
+	recalculate(s, best ? `Scouts found ${next.name} at ${next.shop}` : `No listing found for ${s.view.scoutWants?.[wishId]?.query ?? wish.name}`)
+	for (const role of ROLES.slice(0, 3)) launch(s, role)
+	launch(s, "StrategyAgent")
+	notify(s)
+}
+
+/** "Use this instead": the chosen card becomes the best pick and the old best pick takes its place. */
+function promoteChosen(s: Session) {
+	for (const w of s.view.goal.wishes) {
+		const r = s.view.scouts?.[w.id]
+		if (!r?.best || !w.link || r.best.url === w.link) continue
+		for (const list of [r.next, r.mentions]) {
+			const i = list.findIndex(l => l.url === w.link)
+			if (i < 0) continue
+			const chosen = list[i]
+			list[i] = r.best
+			r.best = chosen
+			break
+		}
+	}
 }
