@@ -140,6 +140,7 @@ function candidateOf(l: ScoutListing): ScoutCandidate {
 		site: l.site,
 		shop: l.shop,
 		title: l.title,
+		category: l.category,
 		price: l.price,
 		delivery: l.delivery,
 		inStock: l.inStock,
@@ -263,11 +264,11 @@ export async function runScouts(want: ScoutWant, deps: RunDeps): Promise<ScoutRe
 	}
 
 	for (const outcome of outcomes.values()) sites[outcome.site] = outcome.report
-	const end = clock()
 	const result = await buildResult(want, SCOUT_SITES.flatMap((site) => outcomes.get(site)?.candidates ?? []), sites, deps, {
 		verify: true,
-		finishedAt: new Date(end).toISOString(),
+		finishedAt: "",
 	})
+	result.finishedAt = new Date(clock()).toISOString()
 	if (!deps.isCancelled?.()) cache.set(key, { result: structuredClone(result), expires: clock() + CACHE_TTL_MS })
 	return result
 }

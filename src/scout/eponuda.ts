@@ -1,6 +1,6 @@
 import { inRange } from "./rank"
 import { pickCategory } from "../sources/categories"
-import { customerFetch } from "../sources/customer"
+import { comparisonFetch } from "./comparison"
 import { filterCards, parseEponudaCards } from "../sources/eponuda"
 import type { ScoutCandidate, ShopScout } from "./types"
 
@@ -77,7 +77,7 @@ export function parseEponudaProduct(html: string, url: string, now: string): Sco
 	}
 }
 
-export function createEponudaScout(fetchPage: FetchPage = customerFetch): ShopScout {
+export function createEponudaScout(fetchPage: FetchPage = comparisonFetch): ShopScout {
 	return {
 		site: "eponuda",
 		supportsPriceRange: true,

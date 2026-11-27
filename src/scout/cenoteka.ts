@@ -1,7 +1,7 @@
 import { inRange } from "./rank"
 import { pickCategory } from "../sources/categories"
 import { BRAND_TOKENS, filterTiles, parseCenotekaOffers, parseCenotekaTiles, type Offer, type Tile } from "../sources/cenoteka"
-import { customerFetch } from "../sources/customer"
+import { comparisonFetch } from "./comparison"
 import type { ScoutCandidate, ShopScout } from "./types"
 
 type FetchPage = (url: string, opts?: { fresh?: boolean }) => Promise<string | null>
@@ -42,7 +42,7 @@ export function parseCenotekaProduct(html: string, url: string, now: string): Sc
 	}
 }
 
-export function createCenotekaScout(fetchPage: FetchPage = customerFetch): ShopScout {
+export function createCenotekaScout(fetchPage: FetchPage = comparisonFetch): ShopScout {
 	return {
 		site: "cenoteka",
 		supportsPriceRange: true,

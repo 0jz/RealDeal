@@ -136,3 +136,40 @@ test("generic phone search accepts device models without a category word, but no
 test("numeric model identifiers never match by a four-letter prefix", () => {
 	assert.equal(judgeOffline(want({ query: "RTX 4060" }), cand("RTX 4061")).drop, "mismatch")
 })
+
+
+test("live LEGO phone false positive is rejected unless the user wants a toy", () => {
+	const title = "LEGO Creator retro telefon 31174, Uzrast 8+"
+	for (const query of ["phone", "telefon", "smartphone"]) assert.equal(judgeOffline(want({ query }), cand(title)).drop, "mismatch")
+	assert.equal(judgeOffline(want({ query: "LEGO telefon" }), cand(title)).drop, undefined)
+})
+
+test("Pro and Lite are valid models for a generic category, not mismatched variants", () => {
+	for (const title of ["Xiaomi pametni telefon Redmi Note 17 Pro 256GB", "Honor Mobilni telefon 600 Lite 256GB"]) {
+		const result = judgeOffline(want({ query: "phone" }), cand(title))
+		assert.equal(result.score, 1)
+		assert.doesNotMatch(result.reason, /different variant/)
+	}
+	assert.match(judgeOffline(want({ query: "iphone 15" }), cand("iPhone 15 Pro")).reason, /different variant/)
+})
+
+
+test("shop categories reject ambiguous accessories, headphones and phone lanyards", () => {
+	const request = want({ query: "phone" })
+	for (const listing of [
+		cand("MAX MOBILE I-PHONE 5/6/7/8 GC-46 beli", { category: "IT & Gaming > Kablovi i adapteri" }),
+		cand("Xiaomi Sušalice Redmi Buds 6 Play, Crne"),
+		cand("Karl Lagerfeld univerzalna vezica za telefon - siva"),
+		cand("HELLO KITTY Leather Wallet Phone bag Silver"),
+		cand("Moxom Cooler za mobilni telefon MX-CP08, Crni"),
+		cand("Bežični Fiksni Telefon"),
+		cand("Galaxy", { category: "Audio > Slušalice" }),
+	]) assert.ok(judgeOffline(request, listing).drop, listing.title)
+	assert.equal(judgeOffline(request, cand("Samsung Galaxy S26", { category: "Mobilni telefoni i tableti > Mobilni telefoni > Smart mobilni telefoni" })).score, 1)
+})
+
+
+test("an explicitly requested landline or phone bag is still searchable", () => {
+	assert.equal(judgeOffline(want({ query: "fiksni telefon" }), cand("Bežični Fiksni Telefon")).drop, undefined)
+	assert.equal(judgeOffline(want({ query: "phone bag" }), cand("GUESS Leather Phone bag Black")).drop, undefined)
+})

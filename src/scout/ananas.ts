@@ -1,6 +1,9 @@
 // Ananas scout. Only the HTML search and product pages: robots.txt disallows
 // /api/, /app2/api/, /en/ and /sr/. Price, picture and link come from one page.
 
+import { pageCategory } from "./category"
+import { judgeOffline } from "./judge"
+import { inRange, MIN_SCORE } from "./rank"
 import { politeFetch } from "../sources/http"
 import type { ScoutCandidate, ShopScout } from "./types"
 import { ScoutBlocked } from "./types"
@@ -24,13 +27,20 @@ async function getHtml(fetchPage: FetchPage, url: string): Promise<string> {
 }
 
 /** Unique product URLs from the server-rendered ais-Hits list, in page order. */
-export function parseAnanasSearch(html: string): string[] {
+export function parseAnanasSearch(html: string, range: { minPrice?: number; maxPrice?: number } = {}, query?: string): string[] {
 	const urls: string[] = []
 	const seen = new Set<string>()
 	const items = html.split(/<li\b[^>]*\bclass=["'][^"']*\bais-Hits-item\b[^"']*["'][^>]*>/i).slice(1)
 	for (const item of items) {
 		const end = item.indexOf("</li>")
 		const block = end < 0 ? item : item.slice(0, end)
+		const title = block.match(/<h2\b[^>]*data-testid=["']product-card-title["'][^>]*>([\s\S]*?)<\/h2>/i)?.[1]
+			?.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').trim()
+		if (query && title && judgeOffline({ wantText: query, query, attributes: [] }, { title }).score < MIN_SCORE) continue
+		// Card prices are only discovery hints; read() and verification still use the product page.
+		const amount = block.match(/<span\b[^>]*class=["'][^"']*text-lg[^"']*["'][^>]*>([\d.,]+)/i)?.[1]
+		const hint = amount ? Number(amount.replace(/\./g, "").replace(",", ".")) : null
+		if (hint !== null && Number.isFinite(hint) && !inRange(hint, range)) continue
 		const href = block.match(/<a\b[^>]*\bhref=["'](\/proizvod\/[^"']+)["']/i)?.[1]
 		if (!href) continue
 		const url = new URL(href, ORIGIN).href
@@ -153,6 +163,7 @@ export function parseAnanasProduct(html: string, url: string, now: string): Scou
 		site: "ananas",
 		shop: name && name.toLowerCase() !== "ananas" ? `Ananas · ${name}` : "Ananas",
 		title: product.name.trim(),
+		category: pageCategory(html),
 		price: amount,
 		delivery: shippingRate(offer),
 		inStock: typeof availability === "string" ? /InStock|LimitedAvailability|PreOrder/i.test(availability) : null,
@@ -165,10 +176,11 @@ export function parseAnanasProduct(html: string, url: string, now: string): Scou
 export function createAnanasScout(fetchPage: FetchPage = politeFetch): ShopScout {
 	return {
 		site: "ananas",
-		// No price filters in the URL: the ranker applies the range to real prices later.
-		async search(query: string, _range?: Parameters<ShopScout["search"]>[1]): Promise<string[]> {
+		supportsPriceRange: true,
+		// Filter the HTML cards locally; no private search API or invented URL parameters.
+		async search(query: string, range?: Parameters<ShopScout["search"]>[1]): Promise<string[]> {
 			const url = `${ORIGIN}/search?query=${encodeURIComponent(query)}`
-			return parseAnanasSearch(await getHtml(fetchPage, url))
+			return parseAnanasSearch(await getHtml(fetchPage, url), range, query)
 		},
 		async read(url: string): Promise<ScoutCandidate | null> {
 			return parseAnanasProduct(await getHtml(fetchPage, url), url, new Date().toISOString())

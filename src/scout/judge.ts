@@ -56,11 +56,35 @@ const VARIANT = ["plus", "pro", "max", "ultra", "mini", "lite", "fe", "edge"]
 export const isRefurbished = (text: string): boolean => tokens(text).some((word) => /^(refabrik|refurb|polovn|koriscen|obnovljen|outlet)/.test(word))
 
 /** Accessories are rejected; the rest score on query overlap (0.8) and attributes (0.2). */
-export function judgeOffline(want: ScoutWant, c: ScoutCandidate): Verdict {
+export function judgeOffline(want: ScoutWant, c: Pick<ScoutCandidate, "title" | "category">): Verdict {
 	const title = tokens(c.title)
 	const query = tokens(want.query)
 	const attributes = want.attributes.flatMap(tokens)
-	if (ACCESSORY.some((phrase) => hasPhrase(title, phrase) && !hasPhrase(query, phrase))) {
+	const resolved = resolveQuery(want.query)
+	const categoryWords = tokens(c.category ?? "")
+	const categoryLeaf = (c.category ?? "").split(">").at(-1) ?? ""
+	const leafCategory = resolveQuery(categoryLeaf).category
+	const toys = new Set(["lego", "toy", "toys", "igracka", "igracke", "igracku", "kocke", "игрушка", "игрушки"])
+	if ((resolved.category || pickCategory(want.query)) && [...title, ...categoryWords].some(word => toys.has(word)) && !query.some(word => toys.has(word))) {
+		return { score: 0, reason: "a toy, not the requested device", drop: "mismatch" }
+	}
+	const extraAccessories = ["vezica", "vezice", "drzac", "nosac", "postolje", "oprema", "charger", "charging", "lanyard", "bag", "bags", "pouch", "cooler"]
+	if (resolved.category && [...title, ...categoryWords].some(word => extraAccessories.includes(word)) && !query.some(word => extraAccessories.includes(word))) {
+		return { score: 0, reason: "an accessory, not the item", drop: "accessory" }
+	}
+	if (resolved.category && leafCategory && resolved.category !== leafCategory) {
+		return { score: 0, reason: "another product category on the shop page", drop: "mismatch" }
+	}
+	// Explicit device words take precedence over brands ("Xiaomi Redmi Buds" is not a phone).
+	const landline = ["fiksni", "fiksne", "landline", "cordless"]
+	if (resolved.category === "phone" && [...title, ...categoryWords].some(word => landline.includes(word)) && !query.some(word => landline.includes(word))) {
+		return { score: 0, reason: "a landline, not a mobile phone", drop: "mismatch" }
+	}
+	const headphones = ["buds", "airpods", "slusalice", "susalice", "headphones", "earbuds"]
+	if (resolved.category === "phone" && title.some(word => headphones.includes(word)) && !query.some(word => headphones.includes(word))) {
+		return { score: 0, reason: "headphones, not a phone", drop: "mismatch" }
+	}
+	if (ACCESSORY.some((phrase) => (hasPhrase(title, phrase) || hasPhrase(categoryWords, phrase)) && !hasPhrase(query, phrase))) {
 		return { score: 0, reason: "an accessory, not the item", drop: "accessory" }
 	}
 	const generic = genericCategory(want.query)
@@ -80,7 +104,8 @@ export function judgeOffline(want: ScoutWant, c: ScoutCandidate): Verdict {
 	const lost = unique(query.filter((word) => /\d/.test(word) && !UNIT.test(word) && !hasWord(title, word)))
 	if (lost.length > 0) return { score: 0, reason: `another model: no ${lost.join(" ")} in the title`, drop: "mismatch" }
 	// Kept, but ranked under exact matches: a variant the user didn't name, or a refurbished/used unit.
-	const extra = VARIANT.filter((word) => title.includes(word) && !query.includes(word))
+	const specificModel = resolved.productIds.length === 1 || query.some(word => /\d/.test(word) && !UNIT.test(word))
+	const extra = specificModel ? VARIANT.filter((word) => title.includes(word) && !query.includes(word)) : []
 	const refurb = isRefurbished(c.title) && !isRefurbished(want.query)
 	if (extra.length > 0 && refurb) return { score: Math.min(score, 0.6), reason: `a different variant: ${extra.join(" ")}; refurbished or used, not new` }
 	if (extra.length > 0) return { score: Math.min(score, 0.7), reason: `a different variant: ${extra.join(" ")}` }

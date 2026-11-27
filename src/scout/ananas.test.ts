@@ -33,6 +33,7 @@ test("the saved product page yields the real price, picture and stock", () => {
 	assert.equal(candidate.checkedAt, now)
 	assert.equal(candidate.delivery, null)
 	assert.equal(candidate.shop, "Ananas · Spark")
+	assert.match(candidate.category ?? "", /Muške jakne/)
 })
 
 test("a page without a Product JSON-LD block is not a candidate", () => {
@@ -68,7 +69,7 @@ test("the scout calls only the encoded HTML search URL", async () => {
 	})
 	const urls = await scout.search("đ ženska jakna & kapuljača", { maxPrice: 8000 })
 	assert.deepEqual(asked, [`https://ananas.rs/search?query=${encodeURIComponent("đ ženska jakna & kapuljača")}`])
-	assert.ok(urls.includes(productUrl))
+	assert.ok(!urls.includes(productUrl), "unrelated men’s jacket is not a match for this query")
 })
 
 test("the scout reads a product page through the injected fetcher", async () => {
@@ -90,4 +91,16 @@ test("a challenge or a 403 becomes ScoutBlocked, never a parsed listing", async 
 		throw new Error("HTTP 403 for https://ananas.rs/search?query=jakna")
 	})
 	await assert.rejects(forbidden.search("jakna", {}), ScoutBlocked)
+})
+
+
+test("live phone search cards exclude toys and ads and supply all three price bands", () => {
+	const html = saved("search-telefon-cards.html")
+	const groups = [[1,33333], [33334,66666], [66667,100000]].map(([minPrice, maxPrice]) => parseAnanasSearch(html, { minPrice, maxPrice }, "phone"))
+	assert.deepEqual(groups.map(g => g.length), [1, 1, 1])
+	assert.match(groups[0][0], /redmi-17-4g/)
+	assert.match(groups[1][0], /redmi-note-17-pro/)
+	assert.match(groups[2][0], /galaxy-s26/)
+	assert.ok(!groups.flat().some(url => /lego|runetto/.test(url)))
+	assert.ok(parseAnanasSearch(html, {}, "LEGO telefon").some(url => url.includes("lego")), "an explicitly requested toy remains searchable")
 })

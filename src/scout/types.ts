@@ -27,6 +27,8 @@ export type ScoutCandidate = {
 	site: ScoutSite
 	shop: string
 	title: string
+	/** Product category or breadcrumb read from the same shop page. */
+	category?: string
 	/** Exact integer RSD, as shown on the page. */
 	price: number
 	delivery: number | null
