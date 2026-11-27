@@ -166,6 +166,7 @@ describe("matchTitle on labelled titles", () => {
 		const expected: Array<[string, string]> = [
 			["maska za iphone 15 pro", "accessory"],
 			["Galaxy S24 Ultra futrola", "accessory"],
+			["Lenovo torba za laptop 15.6\"", "accessory"],
 			["iphone 13 za delove", "damaged"],
 			["Samsung S24 Ultra ekran razbijen", "damaged"],
 			["iCloud lock iPhone 15 Pro", "locked"],

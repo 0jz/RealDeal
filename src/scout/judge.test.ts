@@ -27,6 +27,17 @@ test("an accessory for the item is dropped, even when its title has the query wo
 	assert.deepEqual(verdict, { score: 0, reason: "an accessory, not the item", drop: "accessory" })
 })
 
+test("a bag for a laptop is dropped as an accessory", () => {
+	const verdict = judgeOffline(want({ query: "laptop" }), cand("Lenovo torba za laptop 15.6\""))
+	assert.deepEqual(verdict, { score: 0, reason: "an accessory, not the item", drop: "accessory" })
+})
+
+test("a bag requested by name is not dropped as an accessory", () => {
+	const verdict = judgeOffline(want({ query: "ranac" }), cand("Nike ranac 30L crni"))
+	assert.equal(verdict.drop, undefined)
+	assert.equal(verdict.score, 1)
+})
+
 test("a query that asks for the accessory itself is not rejected", () => {
 	const verdict = judgeOffline(want({ query: "maska za iphone 15" }), cand("Maska za iPhone 15"))
 	assert.equal(verdict.drop, undefined)

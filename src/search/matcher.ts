@@ -121,6 +121,7 @@ const phrase = (text: string) => text.split(" ")
 export const ACCESSORY = [
 	"maska", "maske", "futrola", "futrole", "case", "staklo", "stakla", "folija", "folije", "punjac", "punjaci",
 	"kabl", "kabal", "adapter", "narukvica", "stalak", "prazna kutija", "samo kutija", "kutija od", "kutija za", "kutiju",
+	"ranac", "ranca", "rancevi", "torba", "torbe", "torbu", "torbica", "torbicu", "kais", "kaisa", "kaisu",
 ].map(phrase)
 const CONTROLLER_FIRST = new Set(["dzojstik", "dzojstika", "dzojstiku", "kontroler", "kontrolera"])
 const WANTED = ["kupujem", "kupujemo", "trazim", "trazimo"].map(phrase)
