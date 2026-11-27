@@ -61,11 +61,16 @@ export function judgeOffline(want: ScoutWant, c: Pick<ScoutCandidate, "title" | 
 	const query = tokens(want.query)
 	const attributes = want.attributes.flatMap(tokens)
 	const resolved = resolveQuery(want.query)
-	const categoryWords = tokens(c.category ?? "")
-	const categoryLeaf = (c.category ?? "").split(">").at(-1) ?? ""
+	const categoryParts = (c.category ?? "").split(">")
+	// Start at the deepest recognized device category, retaining its refinements
+	// ("Laptopovi > Torbe" is an accessory, "Laptopovi > Home & Office" is not).
+	// A broader ancestor like "Računari i računarska oprema" describes both.
+	const categoryIndex = categoryParts.findLastIndex(part => resolveQuery(part).category || pickCategory(part))
+	const categoryLeaf = categoryParts[categoryIndex] ?? categoryParts.at(-1) ?? ""
+	const categoryWords = tokens(categoryParts.slice(Math.max(0, categoryIndex)).join(" "))
 	const leafCategory = resolveQuery(categoryLeaf).category
 	const toys = new Set(["lego", "toy", "toys", "igracka", "igracke", "igracku", "kocke", "игрушка", "игрушки"])
-	if ((resolved.category || pickCategory(want.query)) && [...title, ...categoryWords].some(word => toys.has(word)) && !query.some(word => toys.has(word))) {
+	if ((resolved.category || pickCategory(want.query)) && [...title, ...tokens(c.category ?? "")].some(word => toys.has(word)) && !query.some(word => toys.has(word))) {
 		return { score: 0, reason: "a toy, not the requested device", drop: "mismatch" }
 	}
 	const extraAccessories = ["vezica", "vezice", "drzac", "nosac", "postolje", "oprema", "charger", "charging", "lanyard", "bag", "bags", "pouch", "cooler"]
@@ -73,6 +78,11 @@ export function judgeOffline(want: ScoutWant, c: Pick<ScoutCandidate, "title" | 
 		return { score: 0, reason: "an accessory, not the item", drop: "accessory" }
 	}
 	if (resolved.category && leafCategory && resolved.category !== leafCategory) {
+		return { score: 0, reason: "another product category on the shop page", drop: "mismatch" }
+	}
+	const expectedCategoryPage = resolved.category ? pickCategory(CATEGORY_WORDS[resolved.category][0])?.cenoteka : undefined
+	const leafCategoryPage = pickCategory(categoryLeaf)?.cenoteka
+	if (expectedCategoryPage && leafCategoryPage && expectedCategoryPage !== leafCategoryPage) {
 		return { score: 0, reason: "another product category on the shop page", drop: "mismatch" }
 	}
 	// Explicit device words take precedence over brands ("Xiaomi Redmi Buds" is not a phone).
@@ -87,12 +97,16 @@ export function judgeOffline(want: ScoutWant, c: Pick<ScoutCandidate, "title" | 
 	if (ACCESSORY.some((phrase) => (hasPhrase(title, phrase) || hasPhrase(categoryWords, phrase)) && !hasPhrase(query, phrase))) {
 		return { score: 0, reason: "an accessory, not the item", drop: "accessory" }
 	}
+	const laptopParts = ["baterija", "baterije", "battery", "batteries", "delovi", "sto", "stol", "desk"]
+	if (resolved.category === "laptop" && [...title, ...categoryWords].some(word => laptopParts.includes(word)) && !query.some(word => laptopParts.includes(word))) {
+		return { score: 0, reason: "a laptop part or accessory, not a laptop", drop: "accessory" }
+	}
 	const generic = genericCategory(want.query)
 	if (generic) {
 		const actual = resolveQuery(c.title).category
 		const expectedPage = pickCategory(CATEGORY_WORDS[generic.category][0])?.cenoteka
 		const actualPage = pickCategory(c.title)?.cenoteka
-		if (actual === generic.category || (!actual && expectedPage && actualPage === expectedPage)) title.push(...generic.words)
+		if (leafCategory === generic.category || actual === generic.category || (!actual && expectedPage && actualPage === expectedPage)) title.push(...generic.words)
 		else if (actual || actualPage) return { score: 0, reason: "another product category", drop: "mismatch" }
 	}
 	const share = (words: string[]): number =>

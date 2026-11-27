@@ -173,3 +173,27 @@ test("an explicitly requested landline or phone bag is still searchable", () => 
 	assert.equal(judgeOffline(want({ query: "fiksni telefon" }), cand("Bežični Fiksni Telefon")).drop, undefined)
 	assert.equal(judgeOffline(want({ query: "phone bag" }), cand("GUESS Leather Phone bag Black")).drop, undefined)
 })
+
+test("live laptop taxonomy accepts computers under an equipment ancestor", () => {
+	for (const query of ["laptop", "ноутбук"]) {
+		for (const title of ["HP 250 G10", "ACER Aspire Lite 15 AL15-46P", "Acer Gaming laptop Nitro Lite 16 RTX 3050"]) {
+			for (const category of ["LAPTOP", "IT Shop > Računari i računarska oprema > Laptopovi", "IT & Gaming > Laptopovi > Home & Office"]) {
+				assert.equal(judgeOffline(want({ query }), cand(title, { category })).score, 1, `${query}: ${title}`)
+			}
+		}
+	}
+	assert.ok(judgeOffline(want({ query: "HP laptop" }), cand("ACER Aspire Lite", { category: "Laptop" })).score < 0.61)
+	assert.equal(judgeOffline(want({ query: "HP 250 G10" }), cand("HP 250 G9", { category: "Laptop" })).drop, "mismatch")
+})
+
+test("a device leaf does not suppress explicit accessories or a wrong product category", () => {
+	for (const listing of [
+		cand("HP 250", { category: "IT Shop > Oprema za laptopove" }),
+		cand("Lenovo", { category: "IT Shop > Torbe za laptop" }),
+		cand("HP 250", { category: "IT Shop > Laptopovi > Torbe" }),
+		cand("Baterija laptop Dell XPS 15 9530", { category: "Laptop" }),
+		cand("Podesivi sto za Laptop"),
+		cand("HP laptop", { category: "Monitori" }),
+	]) assert.ok(judgeOffline(want({ query: "laptop" }), listing).drop, listing.title)
+	assert.equal(judgeOffline(want({ query: "baterija za laptop" }), cand("Baterija za laptop HP 250")).drop, undefined)
+})

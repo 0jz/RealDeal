@@ -32,6 +32,18 @@ test("category-only want with an upper limit", () => {
 	assert.equal(intent.wants[0].maxPrice, 100000)
 })
 
+test("Russian laptop budget shorthand preserves the request and searches the local category", () => {
+	for (const text of ["ноутбук до 100к", "Ноутбуки до 100000 RSD"]) {
+		const { intent } = parsePrompt(text)
+		assert.equal(intent.budget, 100000)
+		assert.equal(intent.wants.length, 1)
+		assert.equal(intent.wants[0].text, text)
+		assert.equal(intent.wants[0].query, "laptop")
+		assert.equal(intent.wants[0].category, "laptop")
+		assert.equal(intent.wants[0].maxPrice, 100000)
+	}
+})
+
 test("budget and two category wants keep priority order", () => {
 	const { intent } = parsePrompt("imam 120k, treba mi telefon i konzola")
 	assert.equal(intent.budget, 120000)

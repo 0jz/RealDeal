@@ -41,7 +41,7 @@ for (const [id, result] of Object.entries(view.scouts ?? {})) {
 		checks.push({ wish: id, check: "three populated price tiers", passed: tiers.length === 3 && tiers.every(t => t.items.length > 0) })
 		for (const tier of tiers) {
 			console.log(`  ${tier.tier}: ${tier.min}–${tier.max} RSD (${tier.items.length} listings)`)
-			for (const item of tier.items) console.log(`    ${item.title} | ${total(item)} RSD | ${item.shop} | ${item.url}${item.delivery === null ? " | delivery unknown" : ""}`)
+			for (const item of tier.items) console.log(`    ${item.title} | ${total(item)} RSD | ${item.shop} | ${item.url} | stock ${item.inStock === null ? "unknown" : item.inStock ? "confirmed" : "unavailable"}${item.delivery === null ? " | delivery unknown" : ""}`)
 			checks.push({ wish: id, check: `${tier.tier}: verified, in stock or unknown, inside range`, passed: tier.items.every(l => listingOk(l) && !judgeOffline(view.scoutWants![id], l).drop && total(l) >= tier.min && total(l) <= tier.max) })
 		}
 	} else {

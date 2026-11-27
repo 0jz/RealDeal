@@ -37,7 +37,10 @@ function listingLabel(l: ScoutListing): string {
 	let out = `at ${l.shop} · checked ${time(l.checkedAt)}`
 	if (l.delivery === null) out += " · delivery not included (unknown)"
 	if ((l.delivery ?? 0) > 0) out += ` · includes ${rsd(l.delivery ?? 0)} RSD delivery`
-	if (l.verified) out += " · verified"
+	if (l.inStock === null) out += " · availability unconfirmed"
+	else if (l.inStock) out += " · in stock"
+	else out += " · out of stock"
+	if (l.verified) out += " · price rechecked"
 	return out
 }
 

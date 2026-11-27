@@ -7,6 +7,12 @@ export const MAX_PROMPT = 1000
 const fold = (s: string) =>
 	s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "dj")
 
+/** Keep model codes intact while accepting the Russian laptop/budget shorthand. */
+const localTerms = (s: string) => s
+	.replace(/(?<![\p{L}\p{N}])ноутбук(?:и|ов)?(?![\p{L}\p{N}])/giu, "laptop")
+	.replace(/(?<!\p{L})до(?=\s*\d)/giu, "under ")
+	.replace(/(\d)\s*к(?!\p{L})/giu, "$1k")
+
 /** Clauses split on punctuation between non-digits, and on "i" / "and", but not inside "između 50 i 80k". */
 const CLAUSE_SPLIT = /(?<!\d)[.,;!?]|[.,;!?](?!\d)|(?<!(?:[iI]zme[dđ]j?u|[bB]etween)\s+\S+)\s+(?:[aA][nN][dD]|i)\s+/g
 
@@ -207,7 +213,8 @@ export function parsePrompt(text: string): { intent: Intent; unknown: string[] }
 	let lastSell: IntentSell | null = null
 
 	const clauses = raw.split(CLAUSE_SPLIT).map((c) => c.trim()).filter(Boolean)
-	for (const clause of clauses) {
+	for (const originalClause of clauses) {
+		const clause = localTerms(originalClause)
 		const folded = fold(clause)
 		const { productIds, category } = resolveQuery(clause)
 		const productId = productIds.length === 1 ? productIds[0] : undefined
@@ -224,7 +231,7 @@ export function parsePrompt(text: string): { intent: Intent; unknown: string[] }
 		}
 
 		if (isSell) {
-			const sell: IntentSell = { text: clause, productId, condition: fair ? "fair" : "good" }
+			const sell: IntentSell = { text: originalClause, productId, condition: fair ? "fair" : "good" }
 			if (prices.length > 0) sell.expectedPrice = prices[0]
 			if (sells.length < 5) {
 				sells.push(sell)
@@ -246,7 +253,7 @@ export function parsePrompt(text: string): { intent: Intent; unknown: string[] }
 
 		if (hasTarget || (hasSignal && query !== "")) {
 			const want: IntentWant = {
-				text: clause, priority: wants.length + 1, query: query || clause, attributes: attributesOf(clause),
+				text: originalClause, priority: wants.length + 1, query: query || clause, attributes: attributesOf(clause),
 			}
 			if (productId) want.productId = productId
 			if (category) want.category = category

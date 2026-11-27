@@ -42,7 +42,7 @@ export function filterRange(cands: ScoutCandidate[], want: ScoutWant): { kept: S
 	return { kept, dropped }
 }
 
-/** Orders judged candidates: score, then total price, then title. */
+/** Orders by relevance, then confirmed stock, total price and title. */
 export function rank(judged: Judged[]): { ordered: ScoutListing[]; dropped: ScoutTrace[] } {
 	const dropped: ScoutTrace[] = []
 	const scored: Judged[] = []
@@ -93,6 +93,8 @@ function sortRanked(items: Judged[]): Judged[] {
 }
 
 function byTotal(a: Judged, b: Judged): number {
+	const stock = Number(b.inStock === true) - Number(a.inStock === true)
+	if (stock !== 0) return stock
 	const d = total(a) - total(b)
 	if (d !== 0) return d
 	return a.title < b.title ? -1 : a.title > b.title ? 1 : 0

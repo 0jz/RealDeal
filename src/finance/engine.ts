@@ -325,7 +325,7 @@ let scoutShops = shopDeps
 export function setScoutShops(deps: typeof shopDeps) { scoutShops = deps }
 
 // These agent names must stay in sync with the LANES in web/src/AgentBars.tsx.
-const SCOUT_AGENT: Record<RunEvent["site"], string> = { query: "QueryAgent", tehnomedia: "TehnomediaScout", ananas: "AnanasScout", officeshoes: "OfficeShoesScout", gigatron: "GigatronScout", eponuda: "EponudaScout", cenoteka: "CenotekaScout", judge: "JudgeAgent", verify: "VerifyAgent" }
+const SCOUT_AGENT: Record<RunEvent["site"], string> = { query: "QueryAgent", tehnomedia: "TehnomediaScout", ananas: "AnanasScout", officeshoes: "OfficeShoesScout", gigatron: "GigatronScout", eponuda: "EponudaScout", cenoteka: "CenotekaScout", computers: "ComputersScout", judge: "JudgeAgent", verify: "VerifyAgent" }
 
 /** Starts one scouting run per wish that came from a prompt. `fresh` drops cached results ("Check prices again"). */
 function scout(s: Session, fresh: boolean) {

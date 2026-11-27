@@ -38,7 +38,7 @@ export async function verifyListing(l: ScoutListing, deps: VerifyDeps): Promise<
 	const image = l.image !== null && (await imageOk(l.image, deps.contentType)) ? l.image : null
 	return {
 		ok: true,
-		listing: { ...l, image, verified: true, checkedAt: deps.now?.() ?? fresh.checkedAt },
+		listing: { ...l, image, inStock: fresh.inStock, verified: true, checkedAt: deps.now?.() ?? fresh.checkedAt },
 	}
 }
 

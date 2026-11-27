@@ -40,6 +40,12 @@ test("a listing whose page, price and picture check out passes with a fresh chec
 	assert.equal(out.listing.image, "https://ananas.rs/slike/jakna-1.jpg")
 })
 
+test("a fresh page without a stock assertion does not retain an earlier in-stock claim", async () => {
+	const out = await verifyListing(listing(1), stubDeps({ reread: async l => ({ ...l, inStock: null }) }))
+	assert.ok(out.ok)
+	assert.equal(out.listing.inStock, null)
+})
+
 test("a price change drops the listing and the next one moves up", async () => {
 	const cheaperNow = stubDeps({
 		reread: async (l) => ({ site: l.site, shop: l.shop, title: l.title, price: l.price === 5001 ? 4900 : l.price, delivery: null, inStock: true, url: l.url, image: l.image, checkedAt: now() }),

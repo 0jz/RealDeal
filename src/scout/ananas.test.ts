@@ -68,7 +68,7 @@ test("the scout calls only the encoded HTML search URL", async () => {
 		return searchHtml
 	})
 	const urls = await scout.search("đ ženska jakna & kapuljača", { maxPrice: 8000 })
-	assert.deepEqual(asked, [`https://ananas.rs/search?query=${encodeURIComponent("đ ženska jakna & kapuljača")}`])
+	assert.deepEqual(asked, [`https://ananas.rs/search?query=${encodeURIComponent("đ ženska jakna & kapuljača")}&price=%3A8000`])
 	assert.ok(!urls.includes(productUrl), "unrelated men’s jacket is not a match for this query")
 })
 

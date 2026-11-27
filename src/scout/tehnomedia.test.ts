@@ -80,3 +80,9 @@ test("an ambiguous I-PHONE cable preserves the shop category for relevance check
 	assert.equal(candidate?.price, 599)
 	assert.equal(candidate?.category, "IT & Gaming > Kablovi i adapteri")
 })
+
+test("live HP laptop cards need the category when their title omits laptop", async () => {
+	const urls = parseTehnomediaSearch(await page("search-laptop-cards.html"), { maxPrice: 100000 }, "laptop")
+	assert.equal(urls.length, 3)
+	assert.ok(urls.some(u => u.includes("hp-250")))
+})

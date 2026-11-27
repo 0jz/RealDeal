@@ -79,6 +79,12 @@ test("rank orders by score, then total price with delivery", () => {
 	assert.deepEqual(ordered.map((x) => x.title), ["B", "A", "D", "C"])
 })
 
+test("equally relevant in-stock offers precede cheaper listings with unknown availability", () => {
+	const unknown = cand({ title: "unknown", price: 27000, inStock: null })
+	const stocked = cand({ title: "stocked", price: 37999 })
+	assert.deepEqual(rank([unknown, stocked]).ordered.map(l => l.title), ["stocked", "unknown"])
+})
+
 test("scores within 0.05 count as equal and sort by price", () => {
 	const cheapLower = cand({ title: "cheap", score: 0.85, price: 3000 })
 	const priceyHigher = cand({ title: "pricey", score: 0.9, price: 8000 })

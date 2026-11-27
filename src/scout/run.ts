@@ -65,6 +65,7 @@ function emptySites(): Record<ScoutSite, SiteReport> {
 		gigatron: { status: "ok", pages: 0, found: 0 },
 		eponuda: { status: "ok", pages: 0, found: 0 },
 		cenoteka: { status: "ok", pages: 0, found: 0 },
+		computers: { status: "ok", pages: 0, found: 0 },
 	}
 }
 

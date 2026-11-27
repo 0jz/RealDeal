@@ -177,9 +177,13 @@ export function createAnanasScout(fetchPage: FetchPage = politeFetch): ShopScout
 	return {
 		site: "ananas",
 		supportsPriceRange: true,
-		// Filter the HTML cards locally; no private search API or invented URL parameters.
+		// The public price filter uses min:max. Keep the local filter too: search
+		// cards are hints, and the freshly read product price remains authoritative.
 		async search(query: string, range?: Parameters<ShopScout["search"]>[1]): Promise<string[]> {
-			const url = `${ORIGIN}/search?query=${encodeURIComponent(query)}`
+			let url = `${ORIGIN}/search?query=${encodeURIComponent(query)}`
+			if (range?.minPrice !== undefined || range?.maxPrice !== undefined) {
+				url += `&price=${encodeURIComponent(`${range.minPrice ?? ""}:${range.maxPrice ?? ""}`)}`
+			}
 			return parseAnanasSearch(await getHtml(fetchPage, url), range, query)
 		},
 		async read(url: string): Promise<ScoutCandidate | null> {

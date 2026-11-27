@@ -76,7 +76,7 @@ export const productName = (id: string) => {
 /** Words people use for a category, in Serbian and English. Normalized (lowercase, no diacritics). */
 export const CATEGORY_WORDS: Record<Category, string[]> = {
 	phone: ["telefon", "telefoni", "mobilni", "mobilni telefon", "smartphone", "phone"],
-	laptop: ["laptop", "laptopovi", "notebook", "lap top"],
+	laptop: ["laptop", "laptopovi", "notebook", "lap top", "ноутбук", "ноутбуки", "ноутбуков"],
 	tablet: ["tablet", "tableti"],
 	console: ["konzola", "konzole", "console"],
 	tv: ["tv", "televizor", "televizori"],

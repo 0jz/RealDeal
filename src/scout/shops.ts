@@ -8,19 +8,21 @@ import { createEponudaScout } from "./eponuda"
 import { createGigatronScout } from "./gigatron"
 import { OFFICESHOES_OFF_NOTE } from "./officeshoes"
 import { createTehnomediaScout } from "./tehnomedia"
+import { createComputersScout } from "./computers"
 import type { ScoutSite, ShopScout } from "./types"
 import type { VerifyDeps } from "./verify"
 
-const OFF_NOTE = "off in v2: the planner scouts Tehnomedia, Ananas, eponuda and Cenoteka"
+const OFF_NOTE = "off in v2: the planner scouts Tehnomedia, Ananas, Computers.rs (laptops), eponuda and Cenoteka"
 
 export function shopDeps(): { scouts: ShopScout[]; offNotes: Partial<Record<ScoutSite, string>>; verify: VerifyDeps } {
-	const scouts = [createTehnomediaScout(), createAnanasScout(), createEponudaScout(), createCenotekaScout()]
+	const scouts = [createTehnomediaScout(), createAnanasScout(), createEponudaScout(), createCenotekaScout(), createComputersScout()]
 	// Verification must see the live page, not the fetch cache.
 	const fresh = (url: string) => politeFetch(url, { fresh: true })
 	const freshCustomer = (url: string) => comparisonFetch(url, { fresh: true })
 	const rereaders = new Map<ScoutSite, ShopScout>([
 		createTehnomediaScout(fresh),
 		createAnanasScout(fresh),
+		createComputersScout(fresh),
 		createGigatronScout(fresh),
 		createEponudaScout(freshCustomer),
 		createCenotekaScout(freshCustomer),

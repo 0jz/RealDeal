@@ -5,13 +5,13 @@ import type { BudgetGroup } from "../search/budget"
 //
 // Every number here comes from a page a scout fetched during this plan. Nothing is
 // taken from the catalogue (msrp / typicalPrice), which new plans never read.
-// Tehnomedia, Ananas and Office Shoes are shops read directly; eponuda and Cenoteka
+// Tehnomedia, Ananas, Computers.rs and Office Shoes are shops read directly; eponuda and Cenoteka
 // are comparison sites read through the customer profile (src/sources/customer.ts).
 
 /** Sites the scouts can report (see docs/LEGAL_REFERENCE.md). */
-export type ScoutSite = "tehnomedia" | "ananas" | "officeshoes" | "gigatron" | "eponuda" | "cenoteka"
+export type ScoutSite = "tehnomedia" | "ananas" | "officeshoes" | "gigatron" | "eponuda" | "cenoteka" | "computers"
 
-export const SCOUT_SITES: ScoutSite[] = ["tehnomedia", "ananas", "officeshoes", "gigatron", "eponuda", "cenoteka"]
+export const SCOUT_SITES: ScoutSite[] = ["tehnomedia", "ananas", "officeshoes", "gigatron", "eponuda", "cenoteka", "computers"]
 
 export const SITE_NAMES: Record<ScoutSite, string> = {
 	tehnomedia: "Tehnomedia",
@@ -20,6 +20,7 @@ export const SITE_NAMES: Record<ScoutSite, string> = {
 	gigatron: "Gigatron",
 	eponuda: "eponuda",
 	cenoteka: "Cenoteka",
+	computers: "Computers.rs",
 }
 
 /** A product as an adapter read it from the shop's own product page. */
