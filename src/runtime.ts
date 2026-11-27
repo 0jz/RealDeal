@@ -39,7 +39,9 @@ export class Session {
 	get done(): boolean {
 		if (!this.plan) return false
 		if (this.request.mode === "sell" && !this.sell) return false
-		return [...this.sources.values()].every((s) => s.state === "done")
+		if (![...this.sources.values()].every((s) => s.state === "done")) return false
+		// A source can finish while a slower matcher or ranker still processes its last page.
+		return this.cancelled || (this.seen.size === this.rows.size + this.rejected && this.prices.size === this.listings.size)
 	}
 }
 

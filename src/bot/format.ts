@@ -208,6 +208,21 @@ function rowLine(row: ResultRow): string {
 function pickBlock(view: SearchView): string[] {
 	const { request, picks } = view
 	const budget = request.mode === "budget"
+	if (budget && view.budgetTiers) {
+		const rows = new Map(view.groups.flatMap(g => g.rows).map(r => [r.key, r]))
+		return [`<b>Najbolje za ${formatPrice(request.budget ?? 0)}:</b>`, ...view.budgetTiers.map(group => {
+			const label = { budget: "Budžet", mid: "Srednja klasa", top: "Top" }[group.tier]
+			const range = group.min <= group.max ? `${formatPrice(group.min)}–${formatPrice(group.max)}` : `do ${formatPrice(group.max)}`
+			const lines = [`<b>${label}: ${range}</b>`]
+			for (const pick of group.items) {
+				const row = rows.get(pick.key)
+				lines.push(`${row ? link(pick.name, row.url) : esc(pick.name)} — ${formatPrice(pick.total)} · ostaje ${formatPrice(pick.leftover)}`)
+				if (row?.shipping === null) lines.push("Dostava nije uključena: cena nepoznata.")
+			}
+			if (!group.items.length) lines.push(view.done ? "Nema odgovarajućih ponuda u ovom rasponu." : "Tražim predloge…")
+			return lines.join("\n")
+		})]
+	}
 	if (picks.length === 0) {
 		if (!budget) return []
 		return [view.done ? "Nijedan oglas se ne uklapa u budžet." : "Tražim predloge…"]

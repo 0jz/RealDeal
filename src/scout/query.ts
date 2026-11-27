@@ -1,3 +1,6 @@
+import { CATEGORY_WORDS } from "../search/catalogue"
+import { resolveQuery } from "../search/matcher"
+
 // QueryAgent: offline search strings and the shops that sell each kind of thing.
 
 import type { ScoutSite, ScoutWant } from "./types"
@@ -26,6 +29,10 @@ export function buildQueries(want: ScoutWant): string[] {
 		const key = query.toLowerCase()
 		if (query && !out.some((q) => q.toLowerCase() === key)) out.push(query)
 	}
+	// Local shops index Serbian category names; preserve brands and model numbers.
+	const local = want.query.replace(/(?<![\p{L}\p{N}])ноутбук(?:и|ов)?(?![\p{L}\p{N}])/giu, "laptop")
+		.replace(/\b(phone|smartphone|headphones|earbuds|console)\b/gi, word => ({ phone: "telefon", smartphone: "telefon", headphones: "slusalice", earbuds: "slusalice", console: "konzola" })[word.toLowerCase()]!)
+	add(local)
 	add(want.query)
 	add(fold(want.query))
 	for (const attribute of want.attributes) add(`${want.query} ${attribute}`)
@@ -40,6 +47,16 @@ const CLOTHING = new Set([
 
 /** Electronics shops do not sell clothing or shoes; Ananas and Office Shoes do. */
 export function siteFits(site: ScoutSite, want: ScoutWant): boolean {
+	if (site === "computers") return resolveQuery(want.query).category === "laptop"
 	if (site === "ananas" || site === "officeshoes") return true
 	return !words(want.query).some((word) => CLOTHING.has(word))
+}
+
+/** Generic category words may be absent from product titles ("phone" → "Galaxy S24"). */
+export function genericCategory(query: string) {
+	const category = resolveQuery(query).category
+	if (!category) return null
+	const generic = new Set(CATEGORY_WORDS[category].flatMap(words))
+	const present = words(query).filter(word => generic.has(word))
+	return present.length ? { category, words: present } : null
 }

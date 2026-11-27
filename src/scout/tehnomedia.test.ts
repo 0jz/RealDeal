@@ -27,6 +27,7 @@ test("the saved product page gives title, price, image, stock and delivery", asy
 	assert.equal(candidate.delivery, 0)
 	assert.equal(candidate.site, "tehnomedia")
 	assert.equal(candidate.shop, "Tehnomedia")
+	assert.match(candidate.category ?? "", /Smart mobilni telefoni/)
 	assert.equal(candidate.url, productUrl)
 	assert.equal(candidate.checkedAt, now)
 })
@@ -62,4 +63,26 @@ test("the scout reads the product page through the injected fetcher", async () =
 test("a challenge page is reported as blocked", async () => {
 	const scout = createTehnomediaScout(async () => "<html><title>Just a moment...</title></html>")
 	await assert.rejects(() => scout.search("telefon", {}), ScoutBlocked)
+})
+
+
+test("search filters accessory cards and applies the range even if the site ignores URL filters", async () => {
+	const html = await page("search-telefon.html")
+	const urls = parseTehnomediaSearch(html, { minPrice: 33334, maxPrice: 66666 }, "phone")
+	assert.ok(urls.includes(productUrl))
+	assert.ok(!urls.some(url => url.includes("case")))
+	assert.deepEqual(parseTehnomediaSearch(html, { maxPrice: 1 }, "phone"), [])
+})
+
+
+test("an ambiguous I-PHONE cable preserves the shop category for relevance checks", async () => {
+	const candidate = parseTehnomediaProduct(await page("product-cable-jsonld.html"), "https://www.tehnomedia.rs/proizvod/max-mobile-i-phone-5-6-7-8-gc-46-beli", now)
+	assert.equal(candidate?.price, 599)
+	assert.equal(candidate?.category, "IT & Gaming > Kablovi i adapteri")
+})
+
+test("live HP laptop cards need the category when their title omits laptop", async () => {
+	const urls = parseTehnomediaSearch(await page("search-laptop-cards.html"), { maxPrice: 100000 }, "laptop")
+	assert.equal(urls.length, 3)
+	assert.ok(urls.some(u => u.includes("hp-250")))
 })

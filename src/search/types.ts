@@ -1,3 +1,5 @@
+import type { BudgetGroup } from "./budget"
+
 // Shared contract for the search engine. Every module (matcher, sources,
 // agents, server, bot, UI) agrees on these shapes. Change them rarely.
 
@@ -156,6 +158,7 @@ export type SearchView = {
 	sources: SourceStatus[]
 	groups: ProductGroup[]
 	picks: Pick[]
+	budgetTiers?: BudgetGroup<Pick>[]
 	rejected: number
 	sell: SellEstimate | null
 	done: boolean

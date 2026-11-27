@@ -1,5 +1,7 @@
+import { inRange } from "./rank"
 import { pickCategory } from "../sources/categories"
-import { customerFetch, isBackedOff } from "../sources/customer"
+import { comparisonFetch } from "./comparison"
+import { isBackedOff } from "../sources/customer"
 import { filterCards, parseEponudaCards } from "../sources/eponuda"
 import { ScoutBlocked, type ScoutCandidate, type ShopScout } from "./types"
 
@@ -83,10 +85,11 @@ export function parseEponudaProduct(html: string, url: string, now: string): Sco
 	}
 }
 
-export function createEponudaScout(fetchPage: FetchPage = customerFetch): ShopScout {
+export function createEponudaScout(fetchPage: FetchPage = comparisonFetch): ShopScout {
 	return {
 		site: "eponuda",
-		async search(query: string, _range?: Parameters<ShopScout["search"]>[1]): Promise<string[]> {
+		supportsPriceRange: true,
+		async search(query: string, range?: Parameters<ShopScout["search"]>[1]): Promise<string[]> {
 			const category = pickCategory(query)
 			if (!category) return []
 			const html = await fetchOrBlocked(fetchPage, `${ORIGIN}/${category.eponuda}`)
@@ -94,6 +97,7 @@ export function createEponudaScout(fetchPage: FetchPage = customerFetch): ShopSc
 			const seen = new Set<string>()
 			const urls: string[] = []
 			for (const card of filterCards(parseEponudaCards(html), query)) {
+				if (!inRange(card.price, range ?? {})) continue
 				if (!/-cena-\d+$/.test(card.url) || seen.has(card.url)) continue
 				seen.add(card.url)
 				urls.push(card.url)

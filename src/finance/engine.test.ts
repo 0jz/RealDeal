@@ -163,3 +163,15 @@ test("provider failure settles and preserves deterministic safety", async () => 
 		assert.throws(() => act(v, { type: "buy", offerId: "phone" }), /Not enough cash/)
 	} finally { globalThis.fetch = originalFetch; process.env.REALDEAL_LLM = "0"; if (oldKey == null) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = oldKey }
 })
+
+
+test("editing the plan budget rescans with a lower or higher inherited cap", async () => {
+	let view = await scouted((await createGoalFromPrompt({ prompt: "I want a phone. Budget 100000 RSD" })).id)
+	assert.equal(view.scoutWants?.w1.maxPrice, 100000)
+	view = await scouted(act(view, { type: "update-goal", goal: { ...view.goal, cash: 60000 } }).id)
+	assert.equal(view.scoutWants?.w1.maxPrice, 60000)
+	assert.equal(view.scouts?.w1.best, null)
+	assert.deepEqual(view.scouts?.w1.budgetTiers?.map(g => g.max), [20000, 40000, 60000])
+	view = await scouted(act(view, { type: "update-goal", goal: { ...view.goal, cash: 120000 } }).id)
+	assert.equal(view.scoutWants?.w1.maxPrice, 120000)
+})

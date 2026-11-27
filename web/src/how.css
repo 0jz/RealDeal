@@ -1,0 +1,14 @@
+.how-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 24px 0 8px; }
+/* No top padding: the hero's own bottom space is the only gap above the heading. */
+#how { text-align: center; padding-top: 0; }
+#how > .muted { margin-inline: auto; }
+/* One row per group, in the order they work; a group's agents sit side by side in its row, centred.
+   On narrow screens the row wraps. */
+.how-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
+.how-cards > .site-agent { flex: 0 1 320px; }
+@media (min-width: 900px) { .how-cards { flex-wrap: nowrap; } }
+.how-cards > .site-agent { text-align: left; }
+.how-cards > .site-agent { min-width: 0; }
+.how-chips { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.how-chip { font-size: 12px; background: var(--paper); color: var(--muted); border-radius: 999px; padding: 3px 9px; }
+.how-note { margin: 24px auto 0; font-size: 13px; max-width: 760px; }

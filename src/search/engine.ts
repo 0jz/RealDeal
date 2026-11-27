@@ -9,7 +9,7 @@ import { emit, join, resolveRuntime, Session } from "../runtime"
 import { startEngine } from "./agents"
 import { PRODUCTS, productName } from "./catalogue"
 import { EV, type SearchRequested } from "./events"
-import { choosePicks, withinBudget } from "./rank"
+import { chooseBudgetTiers, choosePicks, withinBudget } from "./rank"
 import type { ProductGroup, SearchRequest, SearchView } from "./types"
 
 export type { SearchRequest, SearchView }
@@ -115,6 +115,7 @@ export function getView(searchId: string): SearchView | null {
 		terms: s.plan?.terms ?? [],
 		sources: [...s.sources.values()].map((x) => ({ ...x })),
 		groups,
+		budgetTiers: budget === null ? [] : chooseBudgetTiers(rows, budget),
 		picks: s.request.mode === "sell" ? [] : choosePicks(rows, budget),
 		rejected: s.rejected,
 		sell: s.sell,

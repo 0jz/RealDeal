@@ -140,15 +140,16 @@ export function wishesFromWants(intent: Intent, budget: number, options: Options
 		const name = (sell.productId ? productName(sell.productId) : sell.text.trim()).slice(0, 100)
 		return { id: `s${i + 1}`, name: name || `Item ${i + 1}`, condition: sell.condition, expectedPrice: sell.expectedPrice ?? null, fee: 0, delivery: 0, days: 7 }
 	})
+	const reserve = Math.min(options.reserve ?? intent.reserve ?? 0, budget)
+	const spendable = Math.max(0, budget - reserve)
 	const scoutWants: Record<string, ScoutWant> = {}
 	const wishes: Wish[] = wants.map((want, i) => {
 		const id = `w${i + 1}`
 		const query = (want.query ?? want.text).trim().slice(0, 100)
-		scoutWants[id] = { wantText: want.text.trim().slice(0, 200), query, attributes: want.attributes ?? [], minPrice: want.minPrice, maxPrice: want.maxPrice ?? want.price }
+		scoutWants[id] = { wantText: want.text.trim().slice(0, 200), query, attributes: want.attributes ?? [], minPrice: want.minPrice, requestedMaxPrice: want.maxPrice ?? want.price ?? null, maxPrice: Math.min(want.maxPrice ?? want.price ?? spendable, spendable) }
 		return { id, name: query.slice(0, 100), priority: Math.min(10, Math.max(1, want.priority)), price: 0, delivery: null, shop: "", link: "", warrantyMonths: 24, condition: "new", priceSource: "listing" }
 	})
 	const title = [...wishes.map(w => w.name), ...assets.map(a => `sell ${a.name}`)].join(", ").slice(0, 300)
-	const reserve = Math.min(options.reserve ?? intent.reserve ?? 0, budget)
 	const goal = validateGoal({ title, cash: budget, reserve, deadlineDays: options.deadlineDays ?? intent.deadlineDays ?? 14, minWarrantyMonths: 0, wishes, assets })
 	return { goal, wants: scoutWants }
 }

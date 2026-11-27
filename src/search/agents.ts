@@ -49,12 +49,11 @@ export const queryAgent = defineAgent(QUERY, "Understands what the user asked fo
 		let terms = expandQuery(request.query, 4)
 		let productIds = resolved.productIds
 
-		// "best phone for 100k": search the models in that category a budget could plausibly reach.
+		// Search affordable models across the whole category, including the cheaper bands.
 		if (request.mode === "budget" && !productIds.length && category) {
 			const budget = request.budget ?? Infinity
 			productIds = CATALOGUE.filter((p) => p.category === category && p.msrp * 0.5 <= budget)
-				.sort((a, b) => b.score - a.score)
-				.slice(0, 8)
+				.sort((a, b) => a.msrp - b.msrp || b.score - a.score)
 				.map((p) => p.id)
 			terms = productIds.map((id) => PRODUCTS.get(id)!.model.toLowerCase())
 		}
@@ -101,7 +100,14 @@ function sourceAgent(src: SourceAdapter) {
 				const s = sessionOf(searchId)
 				if (!s) return "unknown search"
 				const st = s.sources.get(src.id)!
-				const result = await src.search(term, page)
+				if (s.cancelled) { finish(searchId, selfId, "cancelled"); return "cancelled" }
+				let result: Awaited<ReturnType<SourceAdapter["search"]>>
+				try { result = await src.search(term, page) }
+				catch (error) {
+					finish(searchId, selfId, "source failed")
+					throw error
+				}
+				if (s.cancelled) { finish(searchId, selfId, "cancelled"); return "cancelled" }
 				st.pages++
 				let fresh = 0
 				for (const listing of result.listings) {
@@ -139,15 +145,17 @@ const MATCHER = "MatcherAgent"
 export const matcherAgent = defineAgent(MATCHER, "Maps each raw listing to a catalogue product despite misspellings, or rejects it.", [
 	on<ListingFound>([EV.listingFound], MATCHER, async ({ searchId, listing }, _e, selfId) => {
 		const s = sessionOf(searchId)
-		if (!s?.plan) return "unknown search"
+		if (!s?.plan || s.cancelled) return "unknown or cancelled search"
 		const key = keyOf(listing)
 		let match = matchTitle(listing.title, listing.description)
 		if (!match.productId && !match.reject) match = (await llmMatch(listing.title)) ?? match
 
+		if (s.cancelled) return "cancelled"
 		const plan = s.plan
 		let reason = match.reject ?? (match.productId ? null : "unknown product")
 		if (!reason && plan.productIds.length && !plan.productIds.includes(match.productId!)) reason = "different model"
 		if (!reason && !plan.productIds.length && plan.category && PRODUCTS.get(match.productId!)?.category !== plan.category) reason = "other category"
+		if (!reason && plan.storageGb && match.storageGb !== plan.storageGb) reason = "different or unknown storage"
 		if (reason) {
 			s.rejected++
 			emit(EV.listingRejected, selfId, { searchId, key, title: listing.title, reason })

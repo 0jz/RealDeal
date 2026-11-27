@@ -1,6 +1,7 @@
 // Pure scoring rules: market price, price flags, row score, budget picks and
 // sell estimates. No I/O and no LLM, so every decision is explainable and tested.
 
+import { groupByBudget, type BudgetGroup } from "./budget"
 import { PRODUCTS, productName } from "./catalogue"
 import type { Condition, Pick as BudgetPick, PriceFlag, ResultRow, SellEstimate } from "./types"
 
@@ -85,7 +86,7 @@ export function rowWhy(r: ResultRow): string {
 
 /** The hard budget cap. Nothing over it may ever be picked. Separate so it can be tested on its own. */
 export function withinBudget<T extends { total: number }>(rows: T[], budget: number): T[] {
-	return rows.filter((r) => Number.isFinite(r.total) && r.total <= budget)
+	return rows.filter((r) => Number.isFinite(r.total) && r.total > 0 && r.total <= budget)
 }
 
 /** A row we'd recommend at all: confidently matched, not a scam price, not a fake discount, not from a caught shop. */
@@ -99,26 +100,28 @@ export const pickable = (r: ResultRow) =>
 const discountVsMarket = (r: ResultRow) => (r.market ? 1 - r.total / r.market : 0)
 
 /**
- * Best buys. Budget mode: the best device you can afford, one pick per product.
+ * Best buys. Budget mode: one strongest recommendation per price band.
  * Search mode: the listings furthest under their market price.
  * The budget is enforced by withinBudget, never by score.
  */
+function asPick(r: ResultRow, budget: number | null): BudgetPick {
+	return { key: r.key, productId: r.productId, name: productName(r.productId), total: r.total,
+		leftover: budget != null ? budget - r.total : 0, why: rowWhy(r) }
+}
+
+export function chooseBudgetTiers(rows: ResultRow[], budget: number): BudgetGroup<BudgetPick>[] {
+	const pool = withinBudget(rows, budget).filter(pickable)
+		.sort((a, b) => b.score - a.score || a.total - b.total || a.key.localeCompare(b.key))
+	return groupByBudget(pool, budget, r => r.total, 1).map(group => ({
+		...group, items: group.items.map(row => asPick(row, budget)),
+	}))
+}
+
 export function choosePicks(rows: ResultRow[], budget: number | null, n = 3): BudgetPick[] {
-	const pool = (budget != null ? withinBudget(rows, budget) : rows).filter(pickable)
-	if (budget != null) pool.sort((a, b) => b.score - a.score || a.total - b.total)
-	else pool.sort((a, b) => discountVsMarket(b) - discountVsMarket(a) || a.total - b.total)
-	const out: BudgetPick[] = []
-	const seen = new Set<string>()
-	for (const r of pool) {
-		if (budget != null && seen.has(r.productId)) continue
-		seen.add(r.productId)
-		const p = PRODUCTS.get(r.productId)
-		const why = [budget != null && p ? `najbolji uređaj u budžetu (${p.model}, ${p.year})` : null, rowWhy(r)].filter(Boolean).join(", ")
-		out.push({ key: r.key, productId: r.productId, name: productName(r.productId), total: r.total, leftover: budget != null ? budget - r.total : 0, why })
-		if (out.length === n) break
-	}
-	if (budget != null && out.some((p) => p.total > budget)) throw new Error("budget cap violated") // unreachable; belt and braces
-	return out
+	if (budget !== null) return chooseBudgetTiers(rows, budget).flatMap(group => group.items).slice(0, n)
+	return rows.filter(pickable)
+		.sort((a, b) => discountVsMarket(b) - discountVsMarket(a) || a.total - b.total || a.key.localeCompare(b.key))
+		.slice(0, n).map(row => asPick(row, null))
 }
 
 /** Sell estimate from comparable rows (same product, condition group, storage when known). */

@@ -1,6 +1,9 @@
 // Tehnomedia scout: the shop's own search page and Product JSON-LD in @graph.
 // Fetching goes through politeFetch by default; tests inject a stub.
 
+import { pageCategory } from "./category"
+import { judgeOffline } from "./judge"
+import { inRange, MIN_SCORE } from "./rank"
 import { politeFetch } from "../sources/http"
 import { ScoutBlocked, type ScoutCandidate, type ShopScout } from "./types"
 
@@ -26,11 +29,17 @@ async function get(fetchPage: (url: string) => Promise<string>, url: string): Pr
 }
 
 /** Product URLs from result cards, unique and in page order. */
-export function parseTehnomediaSearch(html: string): string[] {
+export function parseTehnomediaSearch(html: string, range: { minPrice?: number; maxPrice?: number } = {}, query?: string): string[] {
 	const urls: string[] = []
 	const seen = new Set<string>()
 	const cards = /<article\b[^>]*\bclass\s*=\s*["'][^"']*\btm-product-single\b[^"']*["'][^>]*>([\s\S]*?)<\/article>/gi
 	for (const card of html.matchAll(cards)) {
+		const title = card[1]!.match(/<a\b[^>]*class=["']product-link["'][^>]*>([\s\S]*?)<\/a>/i)?.[1]?.replace(/<[^>]+>/g, "").trim()
+		const category = card[1]!.match(/class=["']product-category["'][^>]*>([^<]+)/i)?.[1]?.trim()
+		if (query && title && judgeOffline({ wantText: query, query, attributes: [] }, { title, category }).score < MIN_SCORE) continue
+		const amount = card[1]!.match(/class=["']tm-product-price["'][^>]*>([\d.,\s]+)/i)?.[1]
+		const hint = amount ? Number(amount.replace(/[.\s]/g, "").replace(",", ".")) : null
+		if (hint !== null && Number.isFinite(hint) && !inRange(hint, range)) continue
 		for (const a of card[1]!.matchAll(/<a\b[^>]*>/gi)) {
 			if (!/\bclass\s*=\s*["'][^"']*\bproduct-link\b/i.test(a[0])) continue
 			const href = /\bhref\s*=\s*["']([^"']+)["']/i.exec(a[0])?.[1]
@@ -91,6 +100,7 @@ export function parseTehnomediaProduct(html: string, url: string, now: string): 
 			site: "tehnomedia",
 			shop: "Tehnomedia",
 			title: String(product.name ?? "").trim(),
+			category: pageCategory(html),
 			price: Math.round(price),
 			delivery: delivery(offer),
 			inStock: inStock(offer.availability),
@@ -112,8 +122,9 @@ function searchUrl(query: string, range: { minPrice?: number; maxPrice?: number 
 export function createTehnomediaScout(fetchPage: (url: string) => Promise<string> = politeFetch): ShopScout {
 	return {
 		site: "tehnomedia",
+		supportsPriceRange: true,
 		async search(query, range) {
-			return parseTehnomediaSearch(await get(fetchPage, searchUrl(query, range)))
+			return parseTehnomediaSearch(await get(fetchPage, searchUrl(query, range)), range, query)
 		},
 		async read(url) {
 			return parseTehnomediaProduct(await get(fetchPage, url), url, new Date().toISOString())

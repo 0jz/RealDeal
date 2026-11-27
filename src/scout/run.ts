@@ -1,9 +1,9 @@
 // Query → scouts → judge → rank → verify, with live partial results and a short cache.
 
-import { resolveQuery } from "../search/matcher"
+import { budgetBands, groupByBudget } from "../search/budget"
 import { judge } from "./judge"
 import { buildQueries, fold, siteFits } from "./query"
-import { filterRange, rank, toSlots } from "./rank"
+import { filterRange, rank, toSlots, total } from "./rank"
 import type {
 	ScoutCandidate,
 	ScoutListing,
@@ -65,6 +65,7 @@ function emptySites(): Record<ScoutSite, SiteReport> {
 		gigatron: { status: "ok", pages: 0, found: 0 },
 		eponuda: { status: "ok", pages: 0, found: 0 },
 		cenoteka: { status: "ok", pages: 0, found: 0 },
+		computers: { status: "ok", pages: 0, found: 0 },
 	}
 }
 
@@ -85,17 +86,29 @@ async function scoutSite(
 	const seen = new Set<string>()
 	emit(deps, site, "start", SITE_NAMES[site])
 	try {
+		const bands = want.maxPrice !== undefined ? budgetBands(want.maxPrice) : []
+		const ranges = scout.supportsPriceRange && bands.length
+			? bands.map(b => ({ minPrice: Math.max(want.minPrice ?? 1, b.min), maxPrice: b.max })).filter(r => r.minPrice <= r.maxPrice)
+			: [{ minPrice: want.minPrice, maxPrice: want.maxPrice }]
+		const queues: string[][] = []
 		for (const query of queries) {
-			const found = await scout.search(query, { minPrice: want.minPrice, maxPrice: want.maxPrice })
-			for (const url of found) {
-				if (seen.has(url)) continue
+			for (const range of ranges) {
+				if (deps.isCancelled?.() || (deps.now ?? Date.now)() - start >= budget) break
+				queues.push(await scout.search(query, range))
+			}
+		}
+		// Round-robin prevents the first query or price band consuming every page slot.
+		for (let i = 0; queues.some(q => i < q.length); i++) {
+			for (const queue of queues) {
+				const url = queue[i]
+				if (!url || seen.has(url)) continue
 				seen.add(url)
 				urls.push(url)
 			}
 		}
-		let timedOut = false
+		let timedOut = (deps.now ?? Date.now)() - start >= budget
 		for (const url of urls) {
-			if (report.pages >= pagesPerSite) break
+			if (report.pages >= pagesPerSite || deps.isCancelled?.()) break
 			if ((deps.now ?? Date.now)() - start >= budget) {
 				timedOut = true
 				break
@@ -128,6 +141,7 @@ function candidateOf(l: ScoutListing): ScoutCandidate {
 		site: l.site,
 		shop: l.shop,
 		title: l.title,
+		category: l.category,
 		price: l.price,
 		delivery: l.delivery,
 		inStock: l.inStock,
@@ -149,16 +163,24 @@ async function buildResult(
 	if (finish.verify) emit(deps, "judge", "start", `${range.kept.length} candidates`)
 	const verdict = await judge(want, range.kept, deps.llmJudge)
 	if (finish.verify) emit(deps, "judge", "done", `${verdict.judged.length} judged`)
-	const { productIds, category } = resolveQuery(want.query)
-	const ranked = rank(verdict.judged, { bySpec: category !== null && productIds.length !== 1 })
+	const ranked = rank(verdict.judged)
 	const slots = toSlots(ranked.ordered)
 	const trace: ScoutTrace[] = [...range.dropped, ...verdict.dropped, ...ranked.dropped]
+	let shown = ranked.ordered
 	let best = slots.best
 	let next = slots.next
 	let mentions = slots.mentions
 	if (finish.verify) {
 		emit(deps, "verify", "start", `${ranked.ordered.length} listings`)
-		const { kept, dropped } = await verifyRanked(ranked.ordered, deps.verify, 10, deps.isCancelled)
+		const bands = want.maxPrice === undefined ? [] : groupByBudget(ranked.ordered, want.maxPrice, total, Infinity)
+		// Verify within each band so ten cheaper matches cannot crowd out the top tier.
+		const checks = bands.length
+			? await Promise.all(bands.map(b => verifyRanked(b.items, deps.verify, 3, deps.isCancelled)))
+			: [await verifyRanked(ranked.ordered, deps.verify, 10, deps.isCancelled)]
+		const verifiedByUrl = new Map(checks.flatMap(c => c.kept).map(l => [l.url, l]))
+		const kept = ranked.ordered.flatMap(l => verifiedByUrl.has(l.url) ? [verifiedByUrl.get(l.url)!] : [])
+		const dropped = checks.flatMap(c => c.dropped)
+		shown = kept
 		for (const failure of dropped) {
 			if (failure.ok) continue
 			trace.push({
@@ -186,6 +208,7 @@ async function buildResult(
 		}
 	}
 	return {
+		budgetTiers: want.maxPrice === undefined ? [] : groupByBudget(shown, want.maxPrice, total),
 		wantText: want.wantText,
 		query: want.query,
 		minPrice: want.minPrice,
@@ -204,7 +227,7 @@ export async function runScouts(want: ScoutWant, deps: RunDeps): Promise<ScoutRe
 	const start = clock()
 	const key = cacheKey(want)
 	const cached = cache.get(key)
-	if (cached && start < cached.expires) return cached.result
+	if (cached && start < cached.expires) return structuredClone(cached.result)
 
 	const queries = buildQueries(want)
 	emit(deps, "query", "start", queries.join(" | "))
@@ -242,11 +265,11 @@ export async function runScouts(want: ScoutWant, deps: RunDeps): Promise<ScoutRe
 	}
 
 	for (const outcome of outcomes.values()) sites[outcome.site] = outcome.report
-	const end = clock()
 	const result = await buildResult(want, SCOUT_SITES.flatMap((site) => outcomes.get(site)?.candidates ?? []), sites, deps, {
 		verify: true,
-		finishedAt: new Date(end).toISOString(),
+		finishedAt: "",
 	})
-	cache.set(key, { result, expires: end + CACHE_TTL_MS })
+	result.finishedAt = new Date(clock()).toISOString()
+	if (!deps.isCancelled?.()) cache.set(key, { result: structuredClone(result), expires: clock() + CACHE_TTL_MS })
 	return result
 }

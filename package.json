@@ -19,6 +19,8 @@
 		"@mozaik-ai/core": "6.0.0",
 		"@number-flow/react": "^0.6.2",
 		"@tailwindcss/vite": "^4.3.5",
+		"@zxing/browser": "^0.2.1",
+		"@zxing/library": "^0.23.0",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
 		"cmdk": "^1.1.1",

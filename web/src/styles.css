@@ -23,7 +23,8 @@
 	--lane-rank: #1b7f3b;
 	--lane-sell: #a4532c;
 
-	--font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--font: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--mono: "Martian Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
 	--night: #0b0f17;
 	--night-sheet: #111827;
 	--night-rule: #1f2937;
@@ -1005,37 +1006,9 @@ a {
 	white-space: nowrap;
 }
 
-.brand {
-	font-size: 13px;
-	font-weight: 800;
-	letter-spacing: 0.12em;
-	text-transform: uppercase;
-	color: var(--muted);
-}
 
-.brand a {
-	color: inherit;
-	text-decoration: none;
-}
 
-.ask {
-	width: 100%;
-	max-width: 720px;
-	margin: 0 auto;
-	padding-top: clamp(8px, 8vh, 72px);
-	display: grid;
-	gap: 16px;
-	justify-items: center;
-	text-align: center;
-}
 
-.ask h1 {
-	font-size: clamp(28px, 5.5vw, 44px);
-	font-weight: 850;
-	font-stretch: 118%;
-	letter-spacing: -0.02em;
-	line-height: 1.05;
-}
 
 .ask-box {
 	width: 100%;
@@ -1077,16 +1050,7 @@ a {
 	font-weight: 700;
 }
 
-.ask .examples {
-	width: 100%;
-	justify-items: center;
-	margin-top: 28px;
-	gap: 12px;
-}
 
-.ask .examples ul {
-	justify-content: center;
-}
 
 .planner-bar {
 	display: flex;

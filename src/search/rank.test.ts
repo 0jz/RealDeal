@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { choosePicks, estimateSale, priceFlag, rowScore, withinBudget } from "./rank"
+import { chooseBudgetTiers, choosePicks, estimateSale, priceFlag, rowScore, withinBudget } from "./rank"
 import type { ResultRow } from "./types"
 
 function row(over: Partial<ResultRow>): ResultRow {
@@ -44,8 +44,8 @@ test("budget is a hard cap: 1 RSD over is never picked, even when it's the best 
 	assert.ok(picks.length > 0)
 	assert.ok(picks.every((p) => p.total <= 100_000))
 	assert.ok(!picks.some((p) => p.productId === "iphone-16-pro"))
-	assert.equal(picks[0].productId, "iphone-15-pro")
-	assert.equal(picks[0].leftover, 1000)
+	assert.equal(picks.at(-1)?.productId, "iphone-15-pro")
+	assert.equal(picks.at(-1)?.leftover, 1000)
 })
 
 test("budget counts delivery: price under budget but price+shipping over is out", () => {
@@ -71,11 +71,11 @@ test("scam-priced, fake-discount and low-trust rows are never picked", () => {
 	)
 })
 
-test("one pick per product, better device first", () => {
+test("one pick per band, ordered from budget to top", () => {
 	const rows = [row({ productId: "iphone-13", total: 40_000 }), row({ productId: "iphone-13", total: 42_000 }), row({ productId: "iphone-15", total: 80_000 })]
 	assert.deepEqual(
 		choosePicks(rows, 100_000).map((p) => p.productId),
-		["iphone-15", "iphone-13"],
+		["iphone-13", "iphone-15"],
 	)
 })
 
@@ -94,4 +94,16 @@ test("sell estimate uses comps of the same model and condition", () => {
 	assert.ok(est.quick! < est.patient!)
 	assert.ok(est.quick! >= 50_000 && est.patient! <= 60_000)
 	assert.match(est.draft!.description, /86%/)
+})
+
+
+test("each budget tier picks its strongest eligible device and preserves empty tiers", () => {
+	const groups = chooseBudgetTiers([
+		row({ productId: "iphone-13", total: 30000 }),
+		row({ productId: "iphone-15", total: 32000 }),
+		row({ productId: "iphone-15-pro", total: 60000, flag: "suspicious" }),
+		row({ productId: "iphone-15-pro", total: 90000 }),
+	], 100000)
+	assert.deepEqual(groups.map(g => g.items.map(p => p.productId)), [["iphone-15"], [], ["iphone-15-pro"]])
+	assert.equal(groups[0].items[0].leftover, 68000)
 })

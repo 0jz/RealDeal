@@ -1,3 +1,4 @@
+import { parseEponudaCards } from "../sources/eponuda"
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { test } from "node:test"
@@ -58,17 +59,19 @@ test("search fetches one category page and returns only internal product URLs", 
 		asked.push(url)
 		return categoryHtml
 	})
-	const urls = await scout.search("iphone 15", { maxPrice: 60000 })
+	const urls = await scout.search("iphone 15", { maxPrice: 200000 })
 	assert.deepEqual(asked, ["https://www.eponuda.com/mobilni-telefoni-cene"])
 	assert.ok(urls.length > 0)
 	assert.ok(urls.every(url => /-cena-\d+$/.test(url)))
 	assert.equal(new Set(urls).size, urls.length)
 })
 
-test("search ignores the range and caps the internal URLs at eight", async () => {
+test("search filters the card prices before applying the eight URL limit", async () => {
 	const scout = createEponudaScout(async () => categoryHtml)
 	const urls = await scout.search("mobilni telefon", { minPrice: 90000 })
-	assert.equal(urls.length, 8)
+	assert.ok(urls.length <= 8)
+	const cards = parseEponudaCards(categoryHtml)
+	assert.deepEqual(urls, cards.filter(c => c.price >= 90000 && /-cena-\d+$/.test(c.url)).slice(0, 8).map(c => c.url))
 	assert.ok(urls.every(url => /-cena-\d+$/.test(url)))
 })
 
@@ -92,6 +95,12 @@ test("read uses the injected fetcher for the product page", async () => {
 	assert.deepEqual(asked, [productUrl])
 	assert.equal(candidate?.price, 44900)
 	assert.ok(candidate?.checkedAt)
+})
+
+
+test("a tiny price limit does not open expensive product pages", async () => {
+	const scout = createEponudaScout(async () => categoryHtml)
+	assert.deepEqual(await scout.search("telefon", { maxPrice: 1 }), [])
 })
 
 test("an empty page without a challenge is not a block", async () => {

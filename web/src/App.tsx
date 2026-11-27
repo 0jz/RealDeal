@@ -245,7 +245,16 @@ function Picks({ view }: { view: SearchView }) {
 	return (
 		<section className="picks" aria-labelledby="picks-title">
 			<h2 id="picks-title">{budget !== null ? `Najbolje za ${rsd(budget)}` : "Najbolje cene"}</h2>
-			{view.picks.length === 0 ? (
+			{budget !== null && view.budgetTiers ? (
+				<div className="grid gap-4 md:grid-cols-3">
+					{view.budgetTiers.map(tier => <section key={tier.tier}>
+						<h3>{{ budget: "Budžet", mid: "Srednja klasa", top: "Top" }[tier.tier]}</h3>
+						<p>{tier.min <= tier.max ? `${rsd(tier.min)}–${rsd(tier.max)}` : `Do ${rsd(tier.max)}`}</p>
+						{tier.items.length ? <ol className="pick-list">{tier.items.map(p => <PickRow key={p.key} pick={p} rank={1} row={rows.get(p.key)} showLeftover />)}</ol>
+							: <p className="empty">{view.done ? "Nema odgovarajućih ponuda u ovom rasponu." : "Tražim ponude…"}</p>}
+					</section>)}
+				</div>
+			) : view.picks.length === 0 ? (
 				<p className="empty">{view.done ? "Ništa ne staje u ovaj budžet." : "Tražim najbolju kupovinu…"}</p>
 			) : (
 				<ol className="pick-list">
@@ -268,6 +277,7 @@ function PickRow({ pick, rank, row, showLeftover }: { pick: PickItem; rank: numb
 			</div>
 			<div className="pick-money">
 				<strong>{rsd(pick.total)}</strong>
+				{row?.shipping === null && <span className="sub">Dostava nije uključena: cena nepoznata</span>}
 				{showLeftover && <span className="sub">ostaje {rsd(pick.leftover)}</span>}
 				{row && (
 					<a href={row.url} target="_blank" rel="noopener noreferrer">

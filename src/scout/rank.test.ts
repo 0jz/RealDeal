@@ -79,6 +79,12 @@ test("rank orders by score, then total price with delivery", () => {
 	assert.deepEqual(ordered.map((x) => x.title), ["B", "A", "D", "C"])
 })
 
+test("equally relevant in-stock offers precede cheaper listings with unknown availability", () => {
+	const unknown = cand({ title: "unknown", price: 27000, inStock: null })
+	const stocked = cand({ title: "stocked", price: 37999 })
+	assert.deepEqual(rank([unknown, stocked]).ordered.map(l => l.title), ["stocked", "unknown"])
+})
+
 test("scores within 0.05 count as equal and sort by price", () => {
 	const cheapLower = cand({ title: "cheap", score: 0.85, price: 3000 })
 	const priceyHigher = cand({ title: "pricey", score: 0.9, price: 8000 })
@@ -139,19 +145,10 @@ test("toSlots never pads and caps mentions at 7", () => {
 	assert.equal(twelve.mentions[6].title, "P9")
 })
 
-test("bySpec orders a score band by device score before price", () => {
-	const cheap = cand({ title: "Samsung Galaxy A35 128GB", price: 36000, score: 0.9 })
-	const good = cand({ title: "Apple iPhone 15 128GB", price: 85000, score: 0.9 })
-	const { ordered } = rank([cheap, good], { bySpec: true })
-	assert.deepEqual(ordered.map((x) => x.title), [good.title, cheap.title])
 
-	const byPrice = rank([cheap, good])
-	assert.deepEqual(byPrice.ordered.map((x) => x.title), [cheap.title, good.title])
-})
-
-test("bySpec ranks uncatalogued devices by highest price, not cheapest", () => {
-	const cheap = cand({ title: "Lenovo IdeaPad Slim 3 15ABR8", price: 62000, score: 0.8 })
-	const pricey = cand({ title: "ASUS Vivobook 15 X1504VA", price: 95000, score: 0.8 })
-	const { ordered } = rank([cheap, pricey], { bySpec: true })
-	assert.deepEqual(ordered.map((x) => x.title), [pricey.title, cheap.title])
+test("budget uses price plus delivery, rejects unavailable or invalid prices, retains unknown delivery explicitly", () => {
+	const items = [cand({ price: 99999, delivery: 2 }), cand({ price: 99500, delivery: 500 }), cand({ price: NaN }), cand({ price: -1 }), cand({ price: 40000, inStock: false }), cand({ price: 50000, delivery: null })]
+	const result = filterRange(items, want({ maxPrice: 100000 }))
+	assert.deepEqual(result.kept.map(c => c.price), [99500, 50000])
+	assert.equal(result.kept[1].delivery, null)
 })

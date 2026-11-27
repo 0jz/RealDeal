@@ -122,37 +122,85 @@ test("a variant the user didn't name and a refurbished unit rank under the exact
 	assert.equal(judgeOffline(want({ query: "refurbished iPhone 15" }), cand("Refurbished iPhone 15 128GB")).score, 1)
 })
 
-test("a generic category query matches devices by model and drops other categories", () => {
-	const phone = judgeOffline(want({ query: "telefon" }), cand("Apple iPhone 15 128GB Black"))
-	assert.equal(phone.drop, undefined)
-	assert.equal(phone.score, 0.9)
-	assert.equal(phone.reason, "matches: iPhone 15")
 
-	const laptop = judgeOffline(want({ query: "telefon" }), cand("MacBook Air M3 512GB"))
-	assert.equal(laptop.drop, "mismatch")
-	assert.equal(laptop.reason, "not what you asked for")
+test("generic phone search accepts device models without a category word, but not other devices or accessories", () => {
+	for (const query of ["phone", "telefon", "smartphone"]) {
+		assert.equal(judgeOffline(want({ query }), cand("Samsung Galaxy S24 128GB")).score, 1)
+		assert.equal(judgeOffline(want({ query }), cand("Apple iPhone 15 128GB")).score, 1)
+		assert.equal(judgeOffline(want({ query }), cand("Lenovo ThinkPad laptop")).drop, "mismatch")
+		assert.equal(judgeOffline(want({ query }), cand("Huawei smartwatch")).drop, "mismatch")
+		assert.equal(judgeOffline(want({ query }), cand("Maska Samsung Galaxy S24")).drop, "accessory")
+	}
 })
 
-test("a device outside the catalogue is kept for a generic query, ranked under catalogue models", () => {
-	const unknownPhone = judgeOffline(want({ query: "telefon" }), cand("Nothing Phone 2 256GB"))
-	assert.equal(unknownPhone.drop, undefined)
-	assert.equal(unknownPhone.score, 0.8)
+test("numeric model identifiers never match by a four-letter prefix", () => {
+	assert.equal(judgeOffline(want({ query: "RTX 4060" }), cand("RTX 4061")).drop, "mismatch")
+})
 
-	const unknownLaptop = judgeOffline(want({ query: "laptop" }), cand("Lenovo IdeaPad Slim 3 15ABR8 16GB"))
-	assert.equal(unknownLaptop.drop, undefined)
-	assert.equal(unknownLaptop.score, 0.8)
+
+test("live LEGO phone false positive is rejected unless the user wants a toy", () => {
+	const title = "LEGO Creator retro telefon 31174, Uzrast 8+"
+	for (const query of ["phone", "telefon", "smartphone"]) assert.equal(judgeOffline(want({ query }), cand(title)).drop, "mismatch")
+	assert.equal(judgeOffline(want({ query: "LEGO telefon" }), cand(title)).drop, undefined)
+})
+
+test("Pro and Lite are valid models for a generic category, not mismatched variants", () => {
+	for (const title of ["Xiaomi pametni telefon Redmi Note 17 Pro 256GB", "Honor Mobilni telefon 600 Lite 256GB"]) {
+		const result = judgeOffline(want({ query: "phone" }), cand(title))
+		assert.equal(result.score, 1)
+		assert.doesNotMatch(result.reason, /different variant/)
+	}
+	assert.match(judgeOffline(want({ query: "iphone 15" }), cand("iPhone 15 Pro")).reason, /different variant/)
+})
+
+
+test("shop categories reject ambiguous accessories, headphones and phone lanyards", () => {
+	const request = want({ query: "phone" })
+	for (const listing of [
+		cand("MAX MOBILE I-PHONE 5/6/7/8 GC-46 beli", { category: "IT & Gaming > Kablovi i adapteri" }),
+		cand("Xiaomi Sušalice Redmi Buds 6 Play, Crne"),
+		cand("Karl Lagerfeld univerzalna vezica za telefon - siva"),
+		cand("HELLO KITTY Leather Wallet Phone bag Silver"),
+		cand("Moxom Cooler za mobilni telefon MX-CP08, Crni"),
+		cand("Bežični Fiksni Telefon"),
+		cand("Galaxy", { category: "Audio > Slušalice" }),
+	]) assert.ok(judgeOffline(request, listing).drop, listing.title)
+	assert.equal(judgeOffline(request, cand("Samsung Galaxy S26", { category: "Mobilni telefoni i tableti > Mobilni telefoni > Smart mobilni telefoni" })).score, 1)
+})
+
+
+test("an explicitly requested landline or phone bag is still searchable", () => {
+	assert.equal(judgeOffline(want({ query: "fiksni telefon" }), cand("Bežični Fiksni Telefon")).drop, undefined)
+	assert.equal(judgeOffline(want({ query: "phone bag" }), cand("GUESS Leather Phone bag Black")).drop, undefined)
+})
+
+test("live laptop taxonomy accepts computers under an equipment ancestor", () => {
+	for (const query of ["laptop", "ноутбук"]) {
+		for (const title of ["HP 250 G10", "ACER Aspire Lite 15 AL15-46P", "Acer Gaming laptop Nitro Lite 16 RTX 3050"]) {
+			for (const category of ["LAPTOP", "IT Shop > Računari i računarska oprema > Laptopovi", "IT & Gaming > Laptopovi > Home & Office"]) {
+				assert.equal(judgeOffline(want({ query }), cand(title, { category })).score, 1, `${query}: ${title}`)
+			}
+		}
+	}
+	assert.ok(judgeOffline(want({ query: "HP laptop" }), cand("ACER Aspire Lite", { category: "Laptop" })).score < 0.61)
+	assert.equal(judgeOffline(want({ query: "HP 250 G10" }), cand("HP 250 G9", { category: "Laptop" })).drop, "mismatch")
+})
+
+test("a device leaf does not suppress explicit accessories or a wrong product category", () => {
+	for (const listing of [
+		cand("HP 250", { category: "IT Shop > Oprema za laptopove" }),
+		cand("Lenovo", { category: "IT Shop > Torbe za laptop" }),
+		cand("HP 250", { category: "IT Shop > Laptopovi > Torbe" }),
+		cand("Baterija laptop Dell XPS 15 9530", { category: "Laptop" }),
+		cand("Podesivi sto za Laptop"),
+		cand("HP laptop", { category: "Monitori" }),
+	]) assert.ok(judgeOffline(want({ query: "laptop" }), listing).drop, listing.title)
+	assert.equal(judgeOffline(want({ query: "baterija za laptop" }), cand("Baterija za laptop HP 250")).drop, undefined)
 })
 
 test("a brand query keeps only that brand's devices", () => {
 	assert.equal(judgeOffline(want({ query: "iphone" }), cand("Apple iPhone 15 128GB Black")).drop, undefined)
-	assert.equal(judgeOffline(want({ query: "iphone" }), cand("Samsung Galaxy S24 128GB")).drop, "mismatch")
-})
-
-test("for a generic query a refurbished device scores under a new one", () => {
-	const newPhone = judgeOffline(want({ query: "telefon" }), cand("Apple iPhone 15 128GB Black"))
-	const refurb = judgeOffline(want({ query: "telefon" }), cand("Refabrikovani Apple iPhone 15 128GB"))
-	assert.equal(newPhone.score, 0.9)
-	assert.equal(refurb.score, 0.65)
+	assert.ok(judgeOffline(want({ query: "iphone" }), cand("Samsung Galaxy S24 128GB")).score < 0.6) // under MIN_SCORE: the ranker drops it
 })
 
 test("the category word \"phone\" matches any phone, not just iPhones", () => {

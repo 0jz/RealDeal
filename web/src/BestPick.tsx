@@ -4,6 +4,8 @@ import { Cpu, Gamepad2, Headphones, Laptop, Smartphone, Tablet, Tv, Watch, type 
 import { useId, useState } from "react"
 import type { Wish } from "../../src/finance/types"
 import { SITE_NAMES, type ScoutListing, type ScoutResult } from "../../src/scout/types"
+import { groupByBudget } from "../../src/search/budget"
+import { total } from "../../src/scout/rank"
 import { ScoutsRead } from "./ScoutsRead"
 
 const ICON: Record<string, LucideIcon> = { phone: Smartphone, laptop: Laptop, tablet: Tablet, console: Gamepad2, tv: Tv, headphones: Headphones, gpu: Cpu, watch: Watch }
@@ -33,8 +35,12 @@ function PictureImg({ src, name, box }: { src: string; name: string; box: string
 
 function listingLabel(l: ScoutListing): string {
 	let out = `at ${l.shop} · checked ${time(l.checkedAt)}`
-	if ((l.delivery ?? 0) > 0) out += ` · + ${rsd(l.delivery ?? 0)} RSD delivery`
-	if (l.verified) out += " · verified"
+	if (l.delivery === null) out += " · delivery not included (unknown)"
+	if ((l.delivery ?? 0) > 0) out += ` · includes ${rsd(l.delivery ?? 0)} RSD delivery`
+	if (l.inStock === null) out += " · availability unconfirmed"
+	else if (l.inStock) out += " · in stock"
+	else out += " · out of stock"
+	if (l.verified) out += " · price rechecked"
 	return out
 }
 
@@ -43,12 +49,12 @@ function ListingCard({ listing, size, busy, onUse }: { listing: ScoutListing; si
 	return <div className="grid h-full gap-2 rounded-lg border border-[var(--rule)] bg-[var(--sheet)] p-3">
 		<Picture src={listing.image ?? null} name={listing.title} size="sm" />
 		<p className={`m-0 font-semibold ${small ? "text-sm" : ""} [display:-webkit-box] overflow-hidden [-webkit-box-orient:vertical] [-webkit-line-clamp:2]`}>{listing.title}</p>
-		<p className="m-0 font-mono text-sm tabular-nums">{rsd(listing.price)} RSD</p>
-		<p className="m-0 text-xs text-[var(--muted)]">{`at ${listing.shop} · checked ${time(listing.checkedAt)}`}</p>
+		<p className="m-0 font-mono text-sm tabular-nums">{rsd(total(listing))} RSD</p>
+		<p className="m-0 text-xs text-[var(--muted)]">{listingLabel(listing)}</p>
 		{!small && <p className="m-0 text-xs text-[var(--muted)]">{listing.reason}</p>}
 		<div className="mt-auto flex flex-wrap gap-2 pt-1">
 			<a className="text-xs font-semibold" href={listing.url} target="_blank" rel="noopener noreferrer nofollow">Open ↗</a>
-			<button type="button" disabled={busy} onClick={() => onUse(listing)} className="border-0 bg-transparent p-0 text-xs font-semibold text-[var(--ink)] underline decoration-[var(--rule)] underline-offset-2 disabled:opacity-50">Use this instead</button>
+			<button type="button" disabled={busy || !listing.verified} onClick={() => onUse(listing)} className="border-0 bg-transparent p-0 text-xs font-semibold text-[var(--ink)] underline decoration-[var(--rule)] underline-offset-2 disabled:opacity-50">Use this instead</button>
 		</div>
 	</div>
 }
@@ -62,6 +68,23 @@ function siteStatusLine(scout: ScoutResult, site: keyof ScoutResult["sites"]): s
 	if (report.status === "off") return `${shop}: not checked${report.note ? ` (${report.note})` : ""}`
 	if (report.status === "skipped") return `${shop}: not sold here`
 	return `${shop}: couldn't finish`
+}
+
+function BudgetTiers({ scout, busy, onUse }: { scout?: ScoutResult; busy: boolean; onUse: (listing: ScoutListing) => void }) {
+	if (scout?.maxPrice === undefined) return null
+	const groups = scout.budgetTiers ?? groupByBudget([...(scout.best ? [scout.best] : []), ...scout.next, ...scout.mentions], scout.maxPrice, total)
+	const labels = { budget: "Budget", mid: "Mid-range", top: "Top" }
+	return <section aria-label="Options by budget" className="grid gap-4">
+		<p className="m-0 text-sm text-[var(--muted)]">Three price ranges within your limit. Known delivery costs are included; unknown delivery is extra. “Top” means the upper price range.</p>
+		<div className="grid gap-4 md:grid-cols-3">
+			{groups.map(group => <section key={group.tier} className="grid content-start gap-3 rounded-lg border border-[var(--rule)] p-3">
+				<h4 className="m-0 font-semibold">{labels[group.tier]}</h4>
+				<p className="m-0 text-sm text-[var(--muted)]">{group.min <= group.max ? `${rsd(group.min)}–${rsd(group.max)}` : `Up to ${rsd(group.max)}`} RSD</p>
+				{group.items.length ? group.items.map(listing => <ListingCard key={listing.url} listing={listing} size="next" busy={busy} onUse={onUse} />)
+					: <p className="m-0 text-sm text-[var(--muted)]">{scout.finishedAt ? "No suitable listings in this range." : "Checking this range…"}</p>}
+			</section>)}
+		</div>
+	</section>
 }
 
 /** The best result for one thing to buy, then the next best listings to swap to. */
@@ -78,8 +101,9 @@ export function BestPick(props: {
 	const reduce = useReducedMotion()
 	const mentionsId = useId()
 	const best = scout?.best ?? null
-	const next = scout?.next ?? []
-	const mentions = scout?.mentions ?? []
+	const tiered = scout?.maxPrice !== undefined
+	const next = tiered ? [] : scout?.next ?? []
+	const mentions = tiered ? [] : scout?.mentions ?? []
 	const finished = !!scout && scout.finishedAt !== ""
 	const totalMore = next.length + mentions.length
 	const range = rangeText(scout?.minPrice, scout?.maxPrice)
@@ -94,6 +118,7 @@ export function BestPick(props: {
 					<p className="m-0 text-sm text-[var(--muted)]">Scouts are checking the shops…</p>
 				</div>
 			</div>
+			<BudgetTiers scout={scout} busy={busy} onUse={onUse} />
 			<ScoutsRead scout={scout} />
 		</article>
 	}
@@ -111,6 +136,7 @@ export function BestPick(props: {
 					{sellFirst.map(name => <p key={name} className="m-0">Sell your {name} first.</p>)}
 				</div>
 			</div>
+			<BudgetTiers scout={scout} busy={busy} onUse={onUse} />
 			<ScoutsRead scout={scout} />
 		</article>
 	}
@@ -124,13 +150,14 @@ export function BestPick(props: {
 					<p className="m-0 text-sm text-[var(--muted)]">Waiting for scouts…</p>
 				</div>
 			</div>
+			<BudgetTiers scout={scout} busy={busy} onUse={onUse} />
 			<ScoutsRead scout={scout} />
 		</article>
 	}
 
 	const showExpand = mentions.length > 0
 	const showLess = totalMore > 0 && totalMore <= 8 && !showExpand && next.length > 0
-	const noNext = finished && next.length === 0 && mentions.length === 0
+	const noNext = !tiered && finished && next.length === 0 && mentions.length === 0
 
 	return <article className="grid gap-6 border-b border-[var(--rule)] py-6">
 		<div className="flex flex-col gap-6 sm:flex-row sm:items-center">
@@ -138,7 +165,7 @@ export function BestPick(props: {
 			<div className="grid min-w-0 gap-2">
 				<h3 className="m-0 text-[clamp(28px,4vw,44px)] leading-tight font-extrabold tracking-[-0.02em] break-words [display:-webkit-box] overflow-hidden [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">{best.title}</h3>
 				<p className="m-0 text-sm text-[var(--muted)]">for: {scout?.query || wish.name}{range ? `, ${range}` : ""}</p>
-				<p className="m-0 font-mono text-[clamp(28px,3.4vw,40px)] font-bold tabular-nums"><NumberFlow value={best.price} locales="sr-RS" /> RSD</p>
+				<p className="m-0 font-mono text-[clamp(28px,3.4vw,40px)] font-bold tabular-nums"><NumberFlow value={total(best)} locales="sr-RS" /> RSD</p>
 				<p className="m-0 text-sm text-[var(--muted)]">{listingLabel(best)}</p>
 				<a className="w-fit font-semibold" href={best.url} target="_blank" rel="noopener noreferrer nofollow">Open this listing ↗</a>
 				<p className="m-0 text-sm text-[var(--muted)]">{best.reason}</p>
@@ -179,6 +206,7 @@ export function BestPick(props: {
 		{showLess && <p className="m-0 text-sm text-[var(--muted)]">Only {totalMore} more listings matched.</p>}
 		{noNext && <p className="m-0 text-sm text-[var(--muted)]">No other listings matched.</p>}
 
+		<BudgetTiers scout={scout} busy={busy} onUse={onUse} />
 		<ScoutsRead scout={scout} />
 	</article>
 }

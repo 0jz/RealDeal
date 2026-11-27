@@ -31,6 +31,12 @@ No credentials are needed. Set `PORT` to change the port. Plans are saved as JSO
 4. **Edit details** opens the full form: add a shop and delivery, cut a warranty below the minimum, or enter a price far below the typical one, and the offer is blocked with the reason shown.
 5. Under **Track what you did**, mark the sale and purchases. For an estimated price you enter what you actually paid; the ledger records that, never the estimate. Reload the page or copy the link: the plan and your records come back.
 
+## Identify a product by barcode
+
+On **New plan** (`/new`), select **Scan barcode**. Use the camera, choose a JPG/PNG/WebP photo, or enter the digits. The result shows the product name, brand and database source; **Add to request** appends the name to your existing request. Camera access requires HTTPS or localhost. Photos and camera frames are decoded locally; only the barcode digits are sent to the server.
+
+Identification uses UPCitemdb, with Open Food Facts as a fallback. Database coverage is incomplete, and identification does not establish a current shop price or stock. The planner still supports its existing catalogue; identifying an item does not automatically add it to that catalogue. See [barcode formats, API, limits and verification](docs/BARCODE_SCANNING.md).
+
 ## Financial model
 
 All arithmetic is deterministic integer RSD (`src/finance/model.ts`). The bounded optimizer evaluates purchase and asset subsets, respects wish priority, then minimizes unnecessary asset sales. A plan has 1–5 items to buy and 0–5 items to sell. Names are matched to the product catalogue only when the match is unambiguous; the catalogue's typical new price is then used for hints, savings and price-risk checks.
@@ -91,6 +97,7 @@ Discount checks are reference-price screening, not a definitive legal verdict. M
 
 - `GET /api/goal/example` — the example goal.
 - `GET /api/products` — catalogue ids, names, categories and typical prices (for hints and swaps).
+- `POST /api/barcode/lookup` — `{barcode: string}`; identifies a checksum-valid retail barcode. Returns 200 with product and source, 400 for invalid input, 404 for no match, 429 for rate limiting or 503 when a database is unavailable.
 - `POST /api/goal/from-prompt` — `{prompt, budget?}`; prompt 1–1,000 characters, budget an integer 0–10,000,000 (otherwise read from the prompt). Interprets the prompt (deterministic parser; with `REALDEAL_LLM=1` an LLM may improve the product mapping but never sets amounts), chooses catalogue products and starts a plan. Returns the view with `intent` and `alternatives`, or 422 `{error, unknown}` when nothing matched or no amount was given. Rate-limited like `POST /api/goal`.
 - `POST /api/goal` — validate a goal and start concurrent analysis (rate-limited, 429).
 - `GET /api/goal/:id` and `/stream` — current snapshot and SSE.

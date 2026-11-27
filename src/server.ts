@@ -8,6 +8,8 @@ import type { Category, SearchMode, SearchRequest } from "./search/types"
 import { commandGoal, createGoal, createGoalFromPrompt, EXAMPLE_GOAL, getGoal, PromptError, subscribeGoal } from "./finance/engine"
 import { CATALOGUE } from "./search/catalogue"
 import type { CommandRequest } from "./finance/types"
+import { normalizeBarcode } from "./barcode/code"
+import { lookupBarcode } from "./barcode/lookup"
 
 // One process: the Mozaik search swarm, a small JSON API, an SSE stream per
 // search, and the UI (Vite middleware in dev, the built files with --prod).
@@ -89,11 +91,28 @@ function allowPlan(ip: string): boolean {
 	return true
 }
 const PRODUCT_LIST = CATALOGUE.map((p) => ({ id: p.id, name: p.model, brand: p.brand, category: p.category, typicalPrice: p.msrp }))
+const barcodeRequests = new Map<string, { start: number; count: number }>()
+function allowBarcode(ip: string): boolean {
+	const now = Date.now()
+	for (const [key, entry] of barcodeRequests) if (now - entry.start >= 60_000) barcodeRequests.delete(key)
+	const entry = barcodeRequests.get(ip) ?? { start: now, count: 0 }
+	if (entry.count >= 20 || (!barcodeRequests.has(ip) && barcodeRequests.size >= 10_000)) return false
+	entry.count++; barcodeRequests.set(ip, entry)
+	return true
+}
 
 async function api(req: IncomingMessage, res: ServerResponse, path: string): Promise<void> {
 	if (req.method === "GET" && path === "/api/health") return json(res, 200, { ok: true })
 	if (req.method === "GET" && path === "/api/goal/example") return json(res, 200, EXAMPLE_GOAL)
 	if (req.method === "GET" && path === "/api/products") return json(res, 200, PRODUCT_LIST)
+	if (req.method === "POST" && path === "/api/barcode/lookup") {
+		const body = await readBody(req).catch(() => null)
+		const code = normalizeBarcode(body && typeof body === "object" ? (body as { barcode?: unknown }).barcode : null)
+		if (!code) return json(res, 400, { error: "Enter a valid EAN-8, UPC-A, EAN-13 or GTIN-14 barcode, including its check digit." })
+		if (!allowBarcode(clientIp(req))) return json(res, 429, { error: "Too many barcode lookups. Please wait a minute." })
+		const result = await lookupBarcode(code)
+		return json(res, result.status === "found" ? 200 : result.status === "not_found" ? 404 : 503, result)
+	}
 	if (req.method === "POST" && path === "/api/goal") {
 		if (!allowPlan(clientIp(req))) return json(res, 429, { error: "Too many new plans from your address; try again later" })
 		try { return json(res, 201, createGoal(await readBody(req))) }
